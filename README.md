@@ -10,6 +10,7 @@ This code depends on the following:
  * Adam Hooper's [js-priority-queue][priority]
  * My [language generation code][language]
 
+ * install python and in the main folder just do : python -m http.server 8002
 ## Support, licensing, ongoing development
 
 This project is, from my perspective, finished.

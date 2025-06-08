@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-translate="title">Generador de Mapas Fantasy Avanzado</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Georgia', serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #2C1810 0%, #4A2C17 100%);
+            color: #E8D5B7;
+            overflow-x: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(10px);
+            border-right: 2px solid #8B4513;
+            overflow-y: auto;
+            padding: 20px;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.3);
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .top-bar {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-bottom: 2px solid #8B4513;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        h1 {
+            color: #D4AF37;
+            margin: 0 0 20px 0;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        
+        .control-section {
+            background: rgba(40, 30, 20, 0.8);
+            border: 1px solid #8B4513;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .control-section h3 {
+            color: #D4AF37;
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            border-bottom: 1px solid #8B4513;
+            padding-bottom: 5px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 3px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        button:hover {
+            background: linear-gradient(135deg, #A0522D 0%, #CD853F 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+        
+        button.active {
+            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 100%);
+            color: #000;
+        }
+        
+        .parameter-controls {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #E8D5B7;
+            font-size: 12px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+            accent-color: #D4AF37;
+        }
+        
+        .value-display {
+            color: #D4AF37;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        svg {
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+            cursor: crosshair;
+        }
+        
+        /* Biomas */
+        .biome-ocean { fill: #2E5984; }
+        .biome-deep-ocean { fill: #1A365D; }
+        .biome-coast { fill: #4A90E2; }
+        .biome-beach { fill: #F4E4BC; }
+        .biome-grassland { fill: #7CB342; }
+        .biome-forest { fill: #388E3C; }
+        .biome-mountain { fill: #6D4C41; }
+        .biome-snow { fill: #E3F2FD; }
+        .biome-desert { fill: #FFB74D; }
+        .biome-jungle { fill: #2E7D32; }
+        .biome-swamp { fill: #4E342E; }
+        .biome-tundra { fill: #90A4AE; }
+        
+        /* Elementos del mapa */
+        .coast { fill: none; stroke: #1A365D; stroke-width: 2; }
+        .river { fill: none; stroke: #4A90E2; stroke-width: 2; opacity: 0.8; }
+        .border { fill: none; stroke: #D32F2F; stroke-width: 2; stroke-dasharray: 5,5; opacity: 0.8; }
+        .slope { stroke: #5D4037; stroke-width: 0.3; opacity: 0.4; }
+        
+        /* Ciudades y puntos de interés */
+        .city-marker {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .city-marker:hover {
+            transform: scale(1.2);
+        }
+        
+        .event-marker {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .event-marker:hover {
+            transform: scale(1.3);
+        }
+        
+        text.city {
+            font-family: 'Georgia', serif;
+            font-weight: bold;
+            fill: #FFE0B2;
+            text-anchor: middle;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            font-size: 12px;
+            pointer-events: none;
+        }
+        
+        text.region {
+            font-family: 'Georgia', serif;
+            font-style: italic;
+            fill: #D4AF37;
+            text-anchor: middle;
+            opacity: 0.9;
+            font-size: 16px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        
+        /* Panel de información */
+        .info-panel {
+            position: absolute;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid #D4AF37;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 350px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+            color: #E8D5B7;
+        }
+        
+        .info-panel h4 {
+            color: #D4AF37;
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+        
+        .info-panel .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #D4AF37;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+        }
+        
+        /* Filtros de mapa */
+        .map-filters {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 5px;
+        }
+        
+        /* Herramientas */
+        .tools-section {
+            border-top: 1px solid #8B4513;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+        
+        .tool-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+        
+        /* Estados y territorios */
+        .territory-controls {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .territory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            margin: 2px 0;
+            background: rgba(60, 50, 40, 0.5);
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .territory-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+        }
+        
+        /* Leyenda */
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid #8B4513;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            max-width: 200px;
+        }
+        
+        .legend h4 {
+            color: #D4AF37;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 8px;
+            border: 1px solid #666;
+        }
+        
+        /* Scroll personalizado */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(40, 30, 20, 0.5);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #8B4513;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #A0522D;
+        }
+        
+        /* Animaciones para notificaciones */
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        /* Botones responsivos */
+        .sidebar-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: rgba(139, 69, 19, 0.9);
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        /* Modo pantalla completa */
+        .app-container[data-fullscreen="true"] .map-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1000;
+        }
+        
+        /* Media queries para responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                z-index: 1000;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .sidebar-toggle {
+                display: block;
+            }
+            
+            .top-bar {
+                padding: 10px;
+            }
+            
+            .filter-group {
+                flex-wrap: wrap;
+            }
+            
+            button {
+                font-size: 10px;
+                padding: 8px 12px;
+            }
+        }
+        
+        /* Mejoras visuales para elementos del mapa */
+        .city-marker circle {
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        .event-marker {
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.7));
+        }
+        
+        /* Elementos de territorio más visibles */
+        .territory-border {
+            stroke-width: 3;
+            stroke-dasharray: 10,5;
+            opacity: 0.8;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3));
+        }    </style>
+</head>
+<body>
+    <div class="app-container">        <!-- Barra lateral de controles -->
+        <div class="sidebar">            <h1 data-translate="mapGenerator">🗺️ Generador de Mapas Fantasy</h1>
+            
+            <!-- Controles de generación -->
+            <div class="control-section">
+                <h3 data-translate="generation">⚙️ Generación</h3>
+                <button onclick="generateNewMap()" style="width: 100%; margin-bottom: 10px;" data-translate="generateNewMap">🎲 Generar Nuevo Mapa</button>
+                <button onclick="downloadMap()" style="width: 100%;" data-translate="downloadSvg">💾 Descargar SVG</button>
+                
+                <div class="parameter-controls">
+                    <label for="npts" data-translate="detailLevel">Nivel de Detalle:</label>
+                    <input type="range" id="npts" min="1000" max="12000" value="6000" oninput="updateParams()">
+                    <span class="value-display" id="npts-value">6000</span>
+                </div>
+                
+                <div class="parameter-controls">
+                    <label for="ncities" data-translate="numberOfCities">Número de Ciudades:</label>
+                    <input type="range" id="ncities" min="5" max="30" value="20" oninput="updateParams()">
+                    <span class="value-display" id="ncities-value">20</span>
+                </div>
+                
+                <div class="parameter-controls">
+                    <label for="nterrs" data-translate="territories">Territorios:</label>
+                    <input type="range" id="nterrs" min="3" max="12" value="6" oninput="updateParams()">
+                    <span class="value-display" id="nterrs-value">6</span>
+                </div>
+                
+                <div class="parameter-controls">
+                    <label for="nevents" data-translate="eventsPoI">Eventos/POI:</label>
+                    <input type="range" id="nevents" min="5" max="25" value="15" oninput="updateParams()">
+                    <span class="value-display" id="nevents-value">15</span>
+                </div>
+            </div>
+            
+            <!-- Filtros de visualización -->
+            <div class="control-section">
+                <h3 data-translate="mapFilters">🔍 Filtros de Mapa</h3>
+                <div class="filter-group">
+                    <button id="filter-physical" class="active" onclick="toggleFilter('physical')" data-translate="physical">Físico</button>
+                    <button id="filter-political" onclick="toggleFilter('political')" data-translate="political">Político</button>
+                    <button id="filter-biomes" onclick="toggleFilter('biomes')" data-translate="biomes">Biomas</button>
+                </div>
+                <div class="filter-group" style="margin-top: 10px;">
+                    <button id="filter-cities" class="active" onclick="toggleFilter('cities')" data-translate="cities">Ciudades</button>
+                    <button id="filter-events" class="active" onclick="toggleFilter('events')" data-translate="events">Eventos</button>
+                    <button id="filter-borders" class="active" onclick="toggleFilter('borders')" data-translate="borders">Fronteras</button>
+                </div>
+            </div>
+            
+            <!-- Herramientas interactivas -->
+            <div class="control-section">
+                <h3 data-translate="tools">🛠️ Herramientas</h3>
+                <div class="tool-grid">
+                    <button id="tool-select" class="active" onclick="selectTool('select')" data-translate="select">👆 Seleccionar</button>
+                    <button id="tool-city" onclick="selectTool('city')" data-translate="city">🏰 Ciudad</button>
+                    <button id="tool-event" onclick="selectTool('event')" data-translate="event">⚡ Evento</button>
+                    <button id="tool-territory" onclick="selectTool('territory')" data-translate="territory">🏛️ Territorio</button>
+                </div>
+            </div>
+            
+            <!-- Gestión de territorios -->
+            <div class="control-section">
+                <h3 data-translate="territoryManagement">🏛️ Territorios</h3>
+                <div class="territory-controls" id="territory-list">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+                <button onclick="addTerritory()" style="width: 100%; margin-top: 10px;" data-translate="newTerritory">➕ Nuevo Territorio</button>
+            </div>
+              <!-- Configuración de biomas -->
+            <div class="control-section">
+                <h3 data-translate="biomeConfig">🌍 Configuración Biomas</h3>
+                <div class="parameter-controls">
+                    <label for="temp-range" data-translate="temperatureRange">Rango de Temperatura:</label>
+                    <input type="range" id="temp-range" min="0" max="100" value="50" oninput="updateBiomes()">
+                    <span class="value-display" id="temp-value">50</span>
+                </div>
+                
+                <div class="parameter-controls">
+                    <label for="humidity-range" data-translate="humidity">Humedad:</label>
+                    <input type="range" id="humidity-range" min="0" max="100" value="50" oninput="updateBiomes()">
+                    <span class="value-display" id="humidity-value">50</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contenido principal -->
+        <div class="main-content">
+            <!-- Barra superior -->            <div class="top-bar">
+                <div class="map-filters">
+                    <span data-translate="view">Vista:</span>
+                    <div class="filter-group">
+                        <button id="view-normal" class="active" onclick="changeView('normal')" data-translate="normal">Normal</button>
+                        <button id="view-height" onclick="changeView('height')" data-translate="height">Altura</button>
+                        <button id="view-climate" onclick="changeView('climate')" data-translate="climate">Clima</button>
+                    </div>                </div><div style="display: flex; gap: 10px;">
+                    <button id="collapse-btn" onclick="toggleSidebar()" data-translate="collapse">←</button>
+                    <button onclick="zoomIn()" data-translate="zoomIn">🔍 Zoom +</button>
+                    <button onclick="zoomOut()" data-translate="zoomOut">🔍 Zoom -</button>
+                    <button onclick="resetView()" data-translate="resetView">🏠 Centrar</button>
+                    <button id="fullscreen-btn" onclick="toggleFullscreen()" data-translate="fullscreen">🖥️ Pantalla completa</button>
+                    <button id="language-btn" onclick="toggleLanguage()" data-translate="language">🌐 Idioma</button>
+                </div>
+            </div>
+            
+            <!-- Contenedor del mapa -->
+            <div class="map-container">
+                <svg id="map"></svg>
+                
+                <!-- Panel de información -->
+                <div class="info-panel" id="info-panel">
+                    <button class="close-btn" onclick="closeInfoPanel()">×</button>
+                    <div id="info-content">
+                        <!-- Contenido dinámico -->
+                    </div>
+                </div>
+                
+                <!-- Leyenda -->
+                <div class="legend" id="legend">
+                    <h4>Leyenda</h4>
+                    <div id="legend-content">
+                        <!-- Contenido dinámico -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>    <!-- Dependencies -->
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-priority-queue@0.1.5/priority-queue.min.js"></script>
+    
+    <!-- Enhanced language generator -->
+    <script>
+        // Generador de idiomas mejorado
+        function makeRandomLanguage() {
+            var consonants = ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'z', 'th', 'ch', 'sh'];
+            var vowels = ['a', 'e', 'i', 'o', 'u', 'ae', 'ai', 'au', 'ea', 'ei', 'ou'];
+            var syllablePatterns = ['CV', 'CVC', 'VC', 'V', 'CCV', 'CVCV'];
+            
+            var syllables = [];
+            for (var i = 0; i < 100; i++) {
+                var pattern = syllablePatterns[Math.floor(Math.random() * syllablePatterns.length)];
+                var syllable = '';
+                for (var j = 0; j < pattern.length; j++) {
+                    if (pattern[j] === 'C') {
+                        syllable += consonants[Math.floor(Math.random() * consonants.length)];
+                    } else {
+                        syllable += vowels[Math.floor(Math.random() * vowels.length)];
+                    }
+                }
+                syllables.push(syllable);
+            }
+            
+            return { syllables: syllables };
+        }
+        
+        function makeName(language, type) {
+            var numSyllables;
+            if (type === 'region') {
+                numSyllables = 2 + Math.floor(Math.random() * 2);
+            } else if (type === 'city') {
+                numSyllables = 1 + Math.floor(Math.random() * 2);
+            } else {
+                numSyllables = 2 + Math.floor(Math.random() * 3);
+            }
+            
+            var name = '';
+            for (var i = 0; i < numSyllables; i++) {
+                var syllable = language.syllables[Math.floor(Math.random() * language.syllables.length)];
+                name += syllable;
+            }
+            
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        }
+    </script>
+      <!-- Main terrain generation code -->
+    <script src="terrain.js"></script>
+    
+    <!-- Translation system -->
+    <script src="translations.js"></script>
+    
+    <!-- Enhanced application logic -->
+    <script>        // Estado global de la aplicación
+        var appState = {
+            currentTool: 'select',
+            activeFilters: {
+                physical: true,
+                political: false,
+                biomes: false,
+                cities: true,
+                events: true,
+                borders: true
+            },
+            currentView: 'normal',
+            territories: [],
+            events: [],
+            cityData: {},
+            territoryData: {},
+            persistentNames: {
+                cities: [],
+                territories: [],
+                events: []
+            },
+            zoom: 1,
+            pan: { x: 0, y: 0 },
+            mapData: null,
+            language: null
+        };
+        
+        // Parámetros de generación
+        var currentParams = {
+            extent: {width: 1, height: 0.75},
+            generator: generateCoast,
+            npts: 6000,
+            ncities: 20,
+            nterrs: 6,
+            nevents: 15,
+            fontsizes: {
+                region: 18,
+                city: 14,
+                town: 12
+            }
+        };
+        
+        // Datos de biomas
+        var biomeData = {
+            ocean: { color: '#2E5984', name: 'Océano', description: 'Vastas extensiones de agua salada' },
+            deepOcean: { color: '#1A365D', name: 'Océano Profundo', description: 'Aguas abisales inexploradas' },
+            coast: { color: '#4A90E2', name: 'Costa', description: 'Aguas costeras poco profundas' },
+            beach: { color: '#F4E4BC', name: 'Playa', description: 'Costas arenosas bañadas por el mar' },
+            grassland: { color: '#7CB342', name: 'Pradera', description: 'Extensas llanuras herbáceas' },
+            forest: { color: '#388E3C', name: 'Bosque', description: 'Densos bosques templados' },
+            mountain: { color: '#6D4C41', name: 'Montaña', description: 'Picos elevados y rocosos' },
+            snow: { color: '#E3F2FD', name: 'Nieve', description: 'Cumbres nevadas perpetuas' },
+            desert: { color: '#FFB74D', name: 'Desierto', description: 'Áridas tierras de arena' },
+            jungle: { color: '#2E7D32', name: 'Selva', description: 'Selvas tropicales densas' },
+            swamp: { color: '#4E342E', name: 'Pantano', description: 'Humedales cenagosos' },
+            tundra: { color: '#90A4AE', name: 'Tundra', description: 'Tierras heladas del norte' }
+        };
+        
+        // Tipos de eventos
+        var eventTypes = [
+            { id: 'dungeon', icon: '🏰', name: 'Mazmorra', description: 'Antigua fortaleza llena de peligros y tesoros' },
+            { id: 'ruins', icon: '🏛️', name: 'Ruinas', description: 'Restos de una civilización perdida' },
+            { id: 'tower', icon: '🗼', name: 'Torre', description: 'Misteriosa torre de un mago' },
+            { id: 'cave', icon: '🕳️', name: 'Cueva', description: 'Profunda caverna natural' },
+            { id: 'temple', icon: '⛩️', name: 'Templo', description: 'Sagrado lugar de adoración' },
+            { id: 'battlefield', icon: '⚔️', name: 'Campo de Batalla', description: 'Sitio de una gran batalla histórica' },
+            { id: 'portal', icon: '🌀', name: 'Portal', description: 'Portal mágico a otros planos' },
+            { id: 'dragon', icon: '🐉', name: 'Guarida de Dragón', description: 'Hogar de una poderosa bestia' }
+        ];
+        
+        // Funciones de actualización de parámetros
+        function updateParams() {
+            currentParams.npts = parseInt(document.getElementById('npts').value);
+            currentParams.ncities = parseInt(document.getElementById('ncities').value);
+            currentParams.nterrs = parseInt(document.getElementById('nterrs').value);
+            currentParams.nevents = parseInt(document.getElementById('nevents').value);
+            
+            document.getElementById('npts-value').textContent = currentParams.npts;
+            document.getElementById('ncities-value').textContent = currentParams.ncities;
+            document.getElementById('nterrs-value').textContent = currentParams.nterrs;
+            document.getElementById('nevents-value').textContent = currentParams.nevents;
+        }
+        
+        function updateBiomes() {
+            var temp = parseInt(document.getElementById('temp-range').value);
+            var humidity = parseInt(document.getElementById('humidity-range').value);
+            
+            document.getElementById('temp-value').textContent = temp;
+            document.getElementById('humidity-value').textContent = humidity;
+            
+            if (appState.mapData) {
+                recalculateBiomes(temp, humidity);
+                updateMapDisplay();
+            }
+        }
+        
+        // Funciones de filtros        // Funciones de filtros con lógica de exclusión mutua
+        function toggleFilter(filterName) {
+            // Manejar filtros mutuamente excluyentes
+            if (filterName === 'political') {
+                if (!appState.activeFilters.political) {
+                    // Activar político y desactivar biomas
+                    appState.activeFilters.political = true;
+                    appState.activeFilters.biomes = false;
+                    
+                    // Actualizar botones
+                    document.getElementById('filter-political').classList.add('active');
+                    document.getElementById('filter-biomes').classList.remove('active');
+                } else {
+                    // Desactivar político
+                    appState.activeFilters.political = false;
+                    document.getElementById('filter-political').classList.remove('active');
+                }
+            } else if (filterName === 'biomes') {
+                if (!appState.activeFilters.biomes) {
+                    // Activar biomas y desactivar político
+                    appState.activeFilters.biomes = true;
+                    appState.activeFilters.political = false;
+                    
+                    // Actualizar botones
+                    document.getElementById('filter-biomes').classList.add('active');
+                    document.getElementById('filter-political').classList.remove('active');
+                } else {
+                    // Desactivar biomas
+                    appState.activeFilters.biomes = false;
+                    document.getElementById('filter-biomes').classList.remove('active');
+                }
+            } else {
+                // Para otros filtros, toggle normal
+                appState.activeFilters[filterName] = !appState.activeFilters[filterName];
+                var button = document.getElementById('filter-' + filterName);
+                if (appState.activeFilters[filterName]) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            }
+            
+            updateMapDisplay();
+        }
+        
+        function changeView(viewName) {
+            // Remover active de todos los botones de vista
+            document.querySelectorAll('[id^="view-"]').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('view-' + viewName).classList.add('active');
+            
+            appState.currentView = viewName;
+            updateMapDisplay();
+        }
+        
+        // Funciones de herramientas
+        function selectTool(toolName) {
+            // Remover active de todas las herramientas
+            document.querySelectorAll('[id^="tool-"]').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tool-' + toolName).classList.add('active');
+            
+            appState.currentTool = toolName;
+            
+            var svg = d3.select('#map');
+            if (toolName === 'select') {
+                svg.style('cursor', 'default');
+            } else {
+                svg.style('cursor', 'crosshair');
+            }
+        }
+        
+        // Gestión de territorios
+        function addTerritory() {
+            var newTerritory = {
+                id: 'terr_' + Date.now(),
+                name: makeName(appState.language, 'region'),
+                color: getRandomColor(),
+                cities: []
+            };
+            
+            appState.territories.push(newTerritory);
+            updateTerritoryList();
+        }
+        
+        function updateTerritoryList() {
+            var container = document.getElementById('territory-list');
+            container.innerHTML = '';
+            
+            appState.territories.forEach(function(territory, index) {
+                var item = document.createElement('div');
+                item.className = 'territory-item';
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="territory-color" style="background-color: ${territory.color}"></div>
+                        <span>${territory.name}</span>
+                    </div>
+                    <button onclick="removeTerritory(${index})" style="padding: 2px 6px; font-size: 10px;">❌</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        function removeTerritory(index) {
+            appState.territories.splice(index, 1);
+            updateTerritoryList();
+            updateMapDisplay();
+        }
+        
+        function getRandomColor() {
+            var colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        // Funciones de zoom y pan
+        function zoomIn() {
+            appState.zoom *= 1.2;
+            updateMapTransform();
+        }
+        
+        function zoomOut() {
+            appState.zoom /= 1.2;
+            updateMapTransform();
+        }
+        
+        function resetView() {
+            appState.zoom = 1;
+            appState.pan = { x: 0, y: 0 };
+            updateMapTransform();
+        }
+        
+        function updateMapTransform() {
+            var svg = d3.select('#map');
+            var g = svg.select('g');
+            if (!g.empty()) {
+                g.attr('transform', `translate(${appState.pan.x}, ${appState.pan.y}) scale(${appState.zoom})`);
+            }
+        }
+          // Generación de mapa mejorada
+        function generateNewMap() {
+            console.log('Generando nuevo mapa avanzado...');
+            
+            var svg = d3.select('#map');
+            svg.selectAll('*').remove();
+            
+            // Redimensionar SVG al contenedor
+            var container = document.querySelector('.map-container');
+            svg.attr('width', container.clientWidth)
+               .attr('height', container.clientHeight);
+            
+            appState.language = makeRandomLanguage();
+            
+            try {
+                // Generar mapa base con configuración inicial
+                var mapOptions = {
+                    view: appState.currentView,
+                    biomes: appState.activeFilters.biomes
+                };
+                var mapData = doMap(svg, currentParams, mapOptions);
+                appState.mapData = mapData;
+                
+                // Generar datos adicionales
+                generateCityData();
+                generateEvents();
+                generateTerritories();
+                
+                // Configurar interactividad
+                setupInteractivity();
+                
+                // Actualizar interfaz
+                updateTerritoryList();
+                updateLegend();
+                updateMapDisplay();
+                
+                console.log('Mapa generado exitosamente!');
+                
+            } catch (error) {
+                console.error('Error generando mapa:', error);
+                alert('Error generando mapa. Revisa la consola para más detalles.');
+            }
+        }        // Generar datos de ciudades CON PERSISTENCIA
+        function generateCityData() {
+            if (!appState.mapData || !appState.mapData.cities) return;
+            
+            // Si ya tenemos nombres persistentes Y coincide el número, usarlos
+            if (appState.persistentNames.cities.length === appState.mapData.cities.length) {
+                appState.mapData.cities.forEach(function(city, index) {
+                    if (!appState.cityData[index]) {
+                        var persistentCity = appState.persistentNames.cities[index];
+                        // Asegurar que tiene stats con valores numéricos
+                        if (!persistentCity.stats || typeof persistentCity.stats.wealth === 'string') {
+                            persistentCity.stats = generateCityStats();
+                        }
+                        
+                        appState.cityData[index] = {
+                            name: persistentCity.name,
+                            population: persistentCity.population || persistentCity.stats.population,
+                            specialty: persistentCity.specialty,
+                            description: persistentCity.description,
+                            stats: persistentCity.stats,
+                            position: city
+                        };
+                    }
+                });
+                return;
+            }
+            
+            // Generar nuevos datos y guardarlos
+            appState.cityData = {};
+            appState.persistentNames.cities = [];
+            
+            appState.mapData.cities.forEach(function(city, index) {
+                var cityName = makeName(appState.language, 'city');
+                var population = 1000 + Math.floor(Math.random() * 50000);
+                var specialty = getRandomSpecialty();
+                var stats = generateCityStats();
+                
+                var cityData = {
+                    name: cityName,
+                    population: population,
+                    specialty: specialty,
+                    description: generateCityDescription(cityName, population, specialty),
+                    stats: stats,
+                    position: city
+                };
+                
+                appState.cityData[index] = cityData;
+                appState.persistentNames.cities.push(cityData);
+            });
+        }
+
+        // Generar territorios CON PERSISTENCIA
+        function generateTerritories() {
+            // Si ya tenemos nombres persistentes, usarlos
+            if (appState.persistentNames.territories.length === currentParams.nterrs) {
+                appState.territories = appState.persistentNames.territories.map(function(terr) {
+                    return {
+                        id: terr.id,
+                        name: terr.name,
+                        color: terr.color,
+                        stats: terr.stats || generateTerritoryStats(),
+                        description: terr.description || generateTerritoryDescription(terr.name),
+                        cities: terr.cities || []
+                    };
+                });
+                return;
+            }
+            
+            // Generar nuevos territorios
+            appState.territories = [];
+            appState.persistentNames.territories = [];
+            
+            for (var i = 0; i < currentParams.nterrs; i++) {
+                var territoryName = makeName(appState.language, 'region');
+                var territoryData = {
+                    id: 'terr_' + i,
+                    name: territoryName,
+                    color: getRandomColor(),
+                    stats: generateTerritoryStats(),
+                    description: generateTerritoryDescription(territoryName),
+                    cities: []
+                };
+                
+                appState.territories.push(territoryData);
+                appState.persistentNames.territories.push(territoryData);
+            }
+        }
+        
+        function getRandomSpecialty() {
+            var specialties = [
+                'Comercio', 'Minería', 'Agricultura', 'Pesca', 'Artesanía',
+                'Magia', 'Militar', 'Académica', 'Puerto', 'Fortaleza'
+            ];
+            return specialties[Math.floor(Math.random() * specialties.length)];
+        }
+        
+        function generateCityDescription(name, population, specialty) {
+            var descriptions = {
+                'Comercio': `${name} es un bullicioso centro comercial con ${population} habitantes, famoso por sus mercados y rutas comerciales.`,
+                'Minería': `La ciudad minera de ${name} alberga ${population} almas, construida junto a ricas vetas de minerales preciosos.`,
+                'Agricultura': `${name} es una próspera ciudad agrícola de ${population} habitantes, rodeada de fértiles campos de cultivo.`,
+                'Pesca': `El puerto pesquero de ${name} sustenta a ${population} habitantes con los abundantes recursos del mar.`,
+                'Artesanía': `${name} es renombrada por sus ${population} artesanos hábiles, cuyos trabajos son codiciados en todo el reino.`,
+                'Magia': `La ciudad mágica de ${name} es hogar de ${population} habitantes y una prestigiosa academia de artes arcanas.`,
+                'Militar': `${name} es una fortaleza militar que protege a ${population} habitantes y controla rutas estratégicas.`,
+                'Académica': `La ciudad universitaria de ${name} alberga ${population} estudiosos y una gran biblioteca.`,
+                'Puerto': `${name} es un importante puerto marítimo con ${population} habitantes, punto de llegada de barcos de tierras lejanas.`,
+                'Fortaleza': `La ciudadela de ${name} protege a ${population} habitantes desde su posición estratégica en las montañas.`
+            };
+            
+            return descriptions[specialty] || `${name} es una ciudad de ${population} habitantes conocida por su ${specialty.toLowerCase()}.`;
+        }
+          // Generar eventos CON PERSISTENCIA
+        function generateEvents() {
+            // Si ya tenemos eventos persistentes, usarlos
+            if (appState.persistentNames.events.length === currentParams.nevents) {
+                appState.events = appState.persistentNames.events.map(function(event) {
+                    return {
+                        id: event.id,
+                        type: event.type,
+                        icon: event.icon,
+                        name: event.name,
+                        description: event.description,
+                        stats: event.stats || generateEventStats(),
+                        position: event.position
+                    };
+                });
+                return;
+            }
+            
+            // Generar nuevos eventos
+            appState.events = [];
+            appState.persistentNames.events = [];
+            
+            for (var i = 0; i < currentParams.nevents; i++) {
+                var eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+                var position = [
+                    (Math.random() - 0.5) * currentParams.extent.width,
+                    (Math.random() - 0.5) * currentParams.extent.height
+                ];
+                
+                var eventData = {
+                    id: 'event_' + i,
+                    type: eventType.id,
+                    icon: eventType.icon,
+                    name: eventType.name + ' de ' + makeName(appState.language, 'location'),
+                    description: eventType.description,
+                    stats: generateEventStats(),
+                    position: position
+                };
+                
+                appState.events.push(eventData);
+                appState.persistentNames.events.push(eventData);
+            }
+        }
+
+        // Generar stats para ciudades
+        function generateCityStats() {
+            return {
+                population: 1000 + Math.floor(Math.random() * 50000),
+                wealth: ['Pobre', 'Modesta', 'Moderada', 'Rica', 'Muy Rica'][Math.floor(Math.random() * 5)],
+                defense: ['Muy Baja', 'Baja', 'Moderada', 'Alta', 'Muy Alta'][Math.floor(Math.random() * 5)],
+                trade: ['Nulo', 'Bajo', 'Moderado', 'Alto', 'Muy Alto'][Math.floor(Math.random() * 5)],
+                magic: ['Nula', 'Baja', 'Moderada', 'Alta', 'Muy Alta'][Math.floor(Math.random() * 5)]
+            };
+        }
+
+        // Generar stats para territorios
+        function generateTerritoryStats() {
+            return {
+                area: Math.floor(Math.random() * 10000) + 1000 + ' km²',
+                population: Math.floor(Math.random() * 500000) + 50000,
+                government: generateGovernment(),
+                military: ['Muy Débil', 'Débil', 'Moderado', 'Fuerte', 'Muy Fuerte'][Math.floor(Math.random() * 5)],
+                economy: ['Pobre', 'Modesta', 'Estable', 'Próspera', 'Muy Próspera'][Math.floor(Math.random() * 5)],
+                relations: generateAlliances()
+            };
+        }
+
+        // Generar stats para eventos
+        function generateEventStats() {
+            return {
+                difficulty: generateDifficulty(),
+                rewards: generateRewards(),
+                participants: Math.floor(Math.random() * 20) + 1,
+                duration: ['Corta', 'Media', 'Larga', 'Épica'][Math.floor(Math.random() * 4)]
+            };
+        }
+
+        // Generar descripción de territorio
+        function generateTerritoryDescription(name) {
+            var descriptions = [
+                `${name} es una región próspera conocida por sus vastos territorios y rica historia.`,
+                `Los dominios de ${name} se extienden por valles fértiles y montañas imponentes.`,
+                `${name} ha sido hogar de nobles y guerreros durante generaciones.`,
+                `La región de ${name} es famosa por sus tradiciones ancestrales y sabiduría.`,
+                `${name} controla importantes rutas comerciales que conectan el reino.`
+            ];
+            return descriptions[Math.floor(Math.random() * descriptions.length)];
+        }
+        
+        // Configurar interactividad
+        function setupInteractivity() {
+            var svg = d3.select('#map');
+            
+            // Zoom y pan
+            var zoom = d3.zoom()
+                .scaleExtent([0.5, 5])
+                .on('zoom', function() {
+                    var transform = d3.event.transform;
+                    appState.zoom = transform.k;
+                    appState.pan = { x: transform.x, y: transform.y };
+                    svg.select('g').attr('transform', transform);
+                });
+            
+            svg.call(zoom);
+            
+            // Click en el mapa
+            svg.on('click', function() {
+                if (appState.currentTool !== 'select') {
+                    var coords = d3.mouse(this);
+                    handleMapClick(coords);
+                }
+            });
+        }
+        
+        function handleMapClick(coords) {
+            switch (appState.currentTool) {
+                case 'city':
+                    addCityAtPosition(coords);
+                    break;
+                case 'event':
+                    addEventAtPosition(coords);
+                    break;
+                case 'territory':
+                    // Implementar lógica de territorio
+                    break;
+            }
+        }
+        
+        function addCityAtPosition(coords) {
+            var cityName = makeName(appState.language, 'city');
+            var newCity = {
+                name: cityName,
+                population: 1000 + Math.floor(Math.random() * 20000),
+                specialty: getRandomSpecialty(),
+                position: coords
+            };
+            
+            // Añadir al mapa
+            renderNewCity(newCity);
+        }
+        
+        function addEventAtPosition(coords) {
+            var eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+            var newEvent = {
+                id: 'event_' + Date.now(),
+                type: eventType.id,
+                icon: eventType.icon,
+                name: eventType.name + ' de ' + makeName(appState.language, 'location'),
+                description: eventType.description,
+                position: coords
+            };
+            
+            appState.events.push(newEvent);
+            renderNewEvent(newEvent);
+        }
+          // Funciones de renderizado
+        function renderNewCity(city) {
+            var svg = d3.select('#map g');
+            
+            var cityGroup = svg.append('g')
+                .attr('class', 'city-marker')
+                .attr('transform', `translate(${city.position[0]}, ${city.position[1]})`);
+            
+            cityGroup.append('circle')
+                .attr('r', 6)
+                .attr('fill', '#FFE0B2')
+                .attr('stroke', '#8B4513')
+                .attr('stroke-width', 2);
+            
+            cityGroup.append('text')
+                .attr('class', 'city')
+                .attr('y', -10)
+                .text(city.name);
+            
+            // Click izquierdo - mostrar info
+            cityGroup.on('click', function() {
+                d3.event.stopPropagation();
+                showCityInfo(city);
+            });
+            
+            // Click derecho - menú contextual
+            cityGroup.on('contextmenu', function() {
+                d3.event.preventDefault();
+                d3.event.stopPropagation();
+                
+                var mouse = d3.mouse(document.body);
+                var cityIndex = Object.keys(appState.cityData).find(key => 
+                    appState.cityData[key].name === city.name
+                );
+                  createContextMenu([
+                    { text: '✏️ Editar nombre', action: () => editCityName(cityIndex) },
+                    { text: '🗑️ Eliminar ciudad', action: () => removeCity(cityIndex) },
+                    { text: '📊 Ver estadísticas', action: () => showCityStatsModal(cityIndex) }
+                ], mouse[0], mouse[1]);
+            });
+        }
+        
+        function renderNewEvent(event) {
+            var svg = d3.select('#map g');
+            
+            var eventGroup = svg.append('g')
+                .attr('class', 'event-marker')
+                .attr('transform', `translate(${event.position[0]}, ${event.position[1]})`);
+            
+            eventGroup.append('text')
+                .attr('font-size', '16')
+                .attr('text-anchor', 'middle')
+                .attr('y', 5)
+                .text(event.icon);
+            
+            eventGroup.on('click', function() {
+                showEventInfo(event);
+            });
+        }
+        
+        // Mostrar información
+        function showCityInfo(city) {
+            var panel = document.getElementById('info-panel');
+            var content = document.getElementById('info-content');
+            
+            content.innerHTML = `
+                <h4>🏰 ${city.name}</h4>
+                <p><strong>Población:</strong> ${city.population.toLocaleString()} habitantes</p>
+                <p><strong>Especialidad:</strong> ${city.specialty}</p>
+                <p>${city.description}</p>
+                <hr>
+                <p><strong>Recursos:</strong> ${generateResources()}</p>
+                <p><strong>Gobierno:</strong> ${generateGovernment()}</p>
+            `;
+            
+            panel.style.display = 'block';
+            positionInfoPanel(city.position);
+        }
+        
+        function showEventInfo(event) {
+            var panel = document.getElementById('info-panel');
+            var content = document.getElementById('info-content');
+            
+            content.innerHTML = `
+                <h4>${event.icon} ${event.name}</h4>
+                <p>${event.description}</p>
+                <hr>
+                <p><strong>Dificultad:</strong> ${generateDifficulty()}</p>
+                <p><strong>Recompensas:</strong> ${generateRewards()}</p>
+                <p><strong>Leyenda:</strong> ${generateLegend(event.name)}</p>
+            `;
+            
+            panel.style.display = 'block';
+            positionInfoPanel(event.position);
+        }
+        
+        function positionInfoPanel(position) {
+            var panel = document.getElementById('info-panel');
+            var container = document.querySelector('.map-container');
+            
+            var x = (position[0] / currentParams.extent.width + 0.5) * container.clientWidth;
+            var y = (position[1] / currentParams.extent.height + 0.5) * container.clientHeight;
+            
+            panel.style.left = Math.min(x + 20, container.clientWidth - 370) + 'px';
+            panel.style.top = Math.min(y + 20, container.clientHeight - 200) + 'px';
+        }
+        
+        function closeInfoPanel() {
+            document.getElementById('info-panel').style.display = 'none';
+        }
+        
+        // Funciones auxiliares para generar contenido
+        function generateResources() {
+            var resources = ['Hierro', 'Oro', 'Piedra', 'Madera', 'Textiles', 'Especias', 'Gemas', 'Sal'];
+            var selected = [];
+            for (var i = 0; i < 2 + Math.floor(Math.random() * 3); i++) {
+                var resource = resources[Math.floor(Math.random() * resources.length)];
+                if (selected.indexOf(resource) === -1) {
+                    selected.push(resource);
+                }
+            }
+            return selected.join(', ');
+        }
+        
+        function generateGovernment() {
+            var govTypes = ['Reino', 'República', 'Ciudad-Estado', 'Ducado', 'Principado', 'Confederación'];
+            return govTypes[Math.floor(Math.random() * govTypes.length)];
+        }
+        
+        function generateDifficulty() {
+            var levels = ['Novato', 'Intermedio', 'Avanzado', 'Experto', 'Legendario'];
+            return levels[Math.floor(Math.random() * levels.length)];
+        }
+        
+        function generateRewards() {
+            var rewards = ['Oro', 'Artefactos Mágicos', 'Libros Antiguos', 'Gemas Raras', 'Armas Encantadas', 'Conocimiento Arcano'];
+            return rewards[Math.floor(Math.random() * rewards.length)];
+        }
+        
+        function generateLegend(name) {
+            var legends = [
+                `Se dice que ${name} fue construido por una civilización perdida hace milenios.`,
+                `Los lugareños susurran que ${name} está maldito y solo los valientes se atreven a explorarlo.`,
+                `Según las leyendas, ${name} guarda el secreto de un poder ancestral.`,
+                `Los bardos cantan historias sobre los tesoros ocultos en ${name}.`,
+                `Antiguos pergaminos mencionan que ${name} es una puerta a otros mundos.`            ];
+            return legends[Math.floor(Math.random() * legends.length)];
+        }
+
+        // Actualizar visualización del mapa
+        function updateMapDisplay() {
+            if (!appState.mapData) return;
+            
+            var svg = d3.select('#map');
+            
+            // Preparar opciones para la visualización
+            var mapOptions = {
+                view: appState.currentView,
+                biomes: appState.activeFilters.biomes,
+                political: appState.activeFilters.political,
+                physical: appState.activeFilters.physical,
+                borders: appState.activeFilters.borders,
+                cities: appState.activeFilters.cities,
+                events: appState.activeFilters.events
+            };
+            
+            // Usar la nueva función de actualización unificada
+            updateVisualization(svg, appState.mapData, mapOptions);
+            
+            // Aplicar filtros de visibilidad para elementos overlay
+            applyMapFilters(svg, mapOptions);
+            
+            updateLegend();
+        }
+            // Actualizar leyenda
+        function updateLegend() {
+            var legendContainer = document.getElementById('legend-content');
+            var legendItems = [];
+            
+            if (appState.currentView === 'height') {
+                legendItems = [
+                    { color: '#000000', name: 'Océano profundo' },
+                    { color: '#4169E1', name: 'Océano' },
+                    { color: '#7FFF00', name: 'Tierra baja' },
+                    { color: '#FFD700', name: 'Colinas' },
+                    { color: '#8B4513', name: 'Montañas' },
+                    { color: '#FFFFFF', name: 'Picos nevados' }
+                ];
+            } else if (appState.currentView === 'climate') {
+                legendItems = [
+                    { color: '#0000FF', name: 'Muy frío' },
+                    { color: '#4169E1', name: 'Frío' },
+                    { color: '#00FF00', name: 'Templado' },
+                    { color: '#FFD700', name: 'Cálido' },
+                    { color: '#FF4500', name: 'Caliente' },
+                    { color: '#FF0000', name: 'Muy caliente' }
+                ];
+            } else if (appState.activeFilters.political) {
+                // Vista política - mostrar territorios actuales
+                legendItems = appState.territories.map(function(territory) {
+                    return { color: territory.color, name: territory.name };
+                });
+                if (legendItems.length === 0) {
+                    legendItems = [
+                        { color: '#FF6B6B', name: 'Reino del Norte' },
+                        { color: '#4ECDC4', name: 'Imperio del Este' },
+                        { color: '#45B7D1', name: 'Confederación del Sur' }
+                    ];
+                }
+            } else if (appState.activeFilters.biomes) {
+                legendItems = [
+                    { color: '#4682B4', name: 'Océano' },
+                    { color: '#9ACD32', name: 'Pradera' },
+                    { color: '#228B22', name: 'Bosque' },
+                    { color: '#8B7D6B', name: 'Montaña' },
+                    { color: '#F4A460', name: 'Desierto' },
+                    { color: '#006400', name: 'Selva' }
+                ];
+            } else {
+                // Vista normal (blanco y negro)
+                legendItems = [
+                    { color: '#000080', name: 'Océano profundo' },
+                    { color: '#4169E1', name: 'Océano' },
+                    { color: '#DDDDDD', name: 'Tierra baja' },
+                    { color: '#888888', name: 'Colinas' },
+                    { color: '#444444', name: 'Montañas' }
+                ];
+            }
+            
+            legendContainer.innerHTML = legendItems.map(item => 
+                `<div class="legend-item">
+                    <div class="legend-color" style="background-color: ${item.color}"></div>
+                    <span>${item.name}</span>
+                </div>`
+            ).join('');
+        }
+        
+        // Descargar mapa
+        function downloadMap() {
+            var svg = document.getElementById('map');
+            var serializer = new XMLSerializer();
+            var source = serializer.serializeToString(svg);
+            
+            source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+            
+            var url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+            var downloadLink = document.createElement("a");
+            downloadLink.href = url;
+            downloadLink.download = "mapa-fantasy-" + Date.now() + ".svg";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+        
+        // Recalcular biomas
+        function recalculateBiomes(temperature, humidity) {
+            // Implementar recálculo de biomas basado en temperatura y humedad
+            console.log('Recalculando biomas con temperatura:', temperature, 'humedad:', humidity);
+        }
+        
+        // Inicialización
+        window.onload = function() {
+            updateParams();
+            
+            // Configurar eventos de redimensionado
+            window.addEventListener('resize', function() {
+                var container = document.querySelector('.map-container');
+                var svg = d3.select('#map');
+                svg.attr('width', container.clientWidth)
+                   .attr('height', container.clientHeight);
+            });
+            
+            generateNewMap();
+            setupResponsiveDesign();
+        };
+        
+        // UI Responsive y pantalla completa
+        var uiState = {
+            fullscreen: false,
+            sidebarCollapsed: false
+        };
+        
+        function toggleFullscreen() {
+            uiState.fullscreen = !uiState.fullscreen;
+            var sidebar = document.querySelector('.sidebar');
+            var appContainer = document.querySelector('.app-container');
+            
+            if (uiState.fullscreen) {
+                sidebar.style.display = 'none';
+                appContainer.style.height = '100vh';
+                document.getElementById('fullscreen-btn').textContent = '↩️ Salir';
+            } else {
+                sidebar.style.display = 'block';
+                document.getElementById('fullscreen-btn').textContent = '🖥️ Pantalla completa';
+            }
+            
+            // Redimensionar mapa
+            setTimeout(() => {
+                var container = document.querySelector('.map-container');
+                var svg = d3.select('#map');
+                svg.attr('width', container.clientWidth)
+                   .attr('height', container.clientHeight);
+            }, 100);
+        }
+        
+        function toggleSidebar() {
+            uiState.sidebarCollapsed = !uiState.sidebarCollapsed;
+            var sidebar = document.querySelector('.sidebar');
+            
+            if (uiState.sidebarCollapsed) {
+                sidebar.style.width = '60px';
+                sidebar.style.overflow = 'hidden';
+                document.getElementById('collapse-btn').textContent = '→';
+            } else {
+                sidebar.style.width = '350px';
+                sidebar.style.overflow = 'auto';
+                document.getElementById('collapse-btn').textContent = '←';
+            }
+            
+            // Redimensionar mapa
+            setTimeout(() => {
+                var container = document.querySelector('.map-container');
+                var svg = d3.select('#map');
+                svg.attr('width', container.clientWidth)
+                   .attr('height', container.clientHeight);
+            }, 300);
+        }
+        
+        // Responsive design para móviles
+        function setupResponsiveDesign() {
+            function checkMobile() {
+                return window.innerWidth <= 768;
+            }
+            
+            function adjustForMobile() {
+                var sidebar = document.querySelector('.sidebar');
+                var topBar = document.querySelector('.top-bar');
+                
+                if (checkMobile()) {
+                    sidebar.style.width = '100vw';
+                    sidebar.style.position = 'fixed';
+                    sidebar.style.left = uiState.sidebarCollapsed ? '-100vw' : '0';
+                    sidebar.style.transition = 'left 0.3s ease';
+                    sidebar.style.zIndex = '1000';
+                    
+                    topBar.style.flexDirection = 'column';
+                    topBar.style.gap = '10px';
+                } else {
+                    sidebar.style.position = 'relative';
+                    sidebar.style.left = '0';
+                    sidebar.style.width = uiState.sidebarCollapsed ? '60px' : '350px';
+                    
+                    topBar.style.flexDirection = 'row';
+                    topBar.style.gap = '0';
+                }
+            }
+            
+            window.addEventListener('resize', adjustForMobile);
+            adjustForMobile();
+        }
+    </script>
+    
+    <!-- Menús contextuales -->
+    <script>
+        // Funciones para menús contextuales
+        function createContextMenu(items, x, y) {
+            // Remover menú contextual existente
+            var existingMenu = document.getElementById('context-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+            
+            var menu = document.createElement('div');
+            menu.id = 'context-menu';
+            menu.style.cssText = `
+                position: fixed;
+                top: ${y}px;
+                left: ${x}px;
+                background: rgba(20, 20, 20, 0.95);
+                border: 1px solid #8B4513;
+                border-radius: 5px;
+                padding: 5px;
+                z-index: 10000;
+                min-width: 150px;
+                font-family: Georgia, serif;
+                color: #E8D5B7;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            `;
+            
+            items.forEach(function(item) {
+                var menuItem = document.createElement('div');
+                menuItem.style.cssText = `
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    border-radius: 3px;
+                    transition: background-color 0.2s;
+                `;
+                menuItem.textContent = item.text;
+                
+                menuItem.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = 'rgba(139, 69, 19, 0.3)';
+                });
+                
+                menuItem.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = 'transparent';
+                });
+                
+                menuItem.addEventListener('click', function() {
+                    item.action();
+                    menu.remove();
+                });
+                
+                menu.appendChild(menuItem);
+            });
+            
+            document.body.appendChild(menu);
+            
+            // Remover menú al hacer click fuera
+            setTimeout(function() {
+                document.addEventListener('click', function handler() {
+                    if (menu.parentNode) {
+                        menu.remove();
+                    }
+                    document.removeEventListener('click', handler);
+                }, 100);
+            });
+        }
+        
+        function editCityName(cityIndex) {
+            if (!cityIndex || !appState.cityData[cityIndex]) return;
+            
+            var city = appState.cityData[cityIndex];
+            var newName = prompt('Nuevo nombre para la ciudad:', city.name);
+            
+            if (newName && newName.trim() !== '') {
+                city.name = newName.trim();
+                
+                // Actualizar visualización
+                updateMapDisplay();
+                
+                // Mostrar confirmación
+                showNotification(`Ciudad renombrada a "${newName}"`);
+            }
+        }
+        
+        function removeCity(cityIndex) {
+            if (!cityIndex || !appState.cityData[cityIndex]) return;
+            
+            var city = appState.cityData[cityIndex];
+            if (confirm(`¿Estás seguro de eliminar la ciudad "${city.name}"?`)) {
+                delete appState.cityData[cityIndex];
+                updateMapDisplay();
+                showNotification(`Ciudad "${city.name}" eliminada`);
+            }
+        }
+        
+        function showCityStats(city) {
+            var panel = document.getElementById('info-panel');
+            var content = document.getElementById('info-content');
+            
+            content.innerHTML = `
+                <h4>📊 Estadísticas de ${city.name}</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0;">
+                    <div>
+                        <strong>Población:</strong><br>
+                        ${city.population.toLocaleString()}
+                    </div>
+                    <div>
+                        <strong>Especialidad:</strong><br>
+                        ${city.specialty}
+                    </div>
+                    <div>
+                        <strong>Nivel:</strong><br>
+                        ${getCityLevel(city.population)}
+                    </div>
+                    <div>
+                        <strong>Riqueza:</strong><br>
+                        ${getCityWealth(city.specialty)}
+                    </div>
+                </div>
+                <hr>
+                <p><strong>Recursos principales:</strong> ${generateResources()}</p>
+                <p><strong>Tipo de gobierno:</strong> ${generateGovernment()}</p>
+                <p><strong>Alianzas:</strong> ${generateAlliances()}</p>
+            `;
+            
+            panel.style.display = 'block';
+            positionInfoPanel(city.position);
+        }
+        
+        function getCityLevel(population) {
+            if (population < 5000) return 'Aldea';
+            if (population < 15000) return 'Pueblo';
+            if (population < 30000) return 'Ciudad';
+            if (population < 50000) return 'Gran Ciudad';
+            return 'Metrópolis';
+        }
+        
+        function getCityWealth(specialty) {
+            var wealthLevels = {
+                'Comercio': 'Rica',
+                'Minería': 'Muy Rica',
+                'Agricultura': 'Moderada',
+                'Pesca': 'Moderada',
+                'Artesanía': 'Rica',
+                'Magia': 'Rica',
+                'Militar': 'Moderada',
+                'Académica': 'Rica',
+                'Puerto': 'Rica',
+                'Fortaleza': 'Pobre'
+            };
+            return wealthLevels[specialty] || 'Moderada';
+        }
+        
+        function generateAlliances() {
+            var alliances = ['Ninguna', 'Liga Comercial', 'Pacto Militar', 'Alianza Mágica', 'Confederación', 'Reino Unido'];
+            return alliances[Math.floor(Math.random() * alliances.length)];
+        }
+        
+        function showNotification(message) {
+            var notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(20, 20, 20, 0.9);
+                color: #D4AF37;
+                padding: 15px 20px;
+                border-radius: 5px;
+                border: 1px solid #8B4513;
+                z-index: 10000;
+                font-family: Georgia, serif;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(function() {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(function() {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+        }, 300);
+            }, 3000);
+        }
+        
+        // Funciones para UI responsive
+        function toggleSidebar() {
+            var sidebar = document.querySelector('.sidebar');
+            var isCollapsed = sidebar.style.transform === 'translateX(-100%)';
+            
+            if (isCollapsed) {
+                sidebar.style.transform = 'translateX(0)';
+                sidebar.style.width = '350px';
+            } else {
+                sidebar.style.transform = 'translateX(-100%)';
+                sidebar.style.width = '0';
+            }
+        }
+        
+        function toggleFullscreen() {
+            var container = document.querySelector('.app-container');
+            var sidebar = document.querySelector('.sidebar');
+            var topBar = document.querySelector('.top-bar');
+            
+            if (container.dataset.fullscreen === 'true') {
+                // Salir de pantalla completa
+                container.dataset.fullscreen = 'false';
+                sidebar.style.display = 'block';
+                topBar.style.display = 'flex';
+                container.style.background = 'linear-gradient(135deg, #2C1810 0%, #4A2C17 100%)';
+            } else {
+                // Entrar en pantalla completa
+                container.dataset.fullscreen = 'true';
+                sidebar.style.display = 'none';
+                topBar.style.display = 'none';
+                container.style.background = '#000';
+            }
+            
+            // Redimensionar mapa
+            setTimeout(function() {                var mapContainer = document.querySelector('.map-container');
+                var svg = d3.select('#map');
+                svg.attr('width', mapContainer.clientWidth)
+                   .attr('height', mapContainer.clientHeight);
+            }, 100);
+        }
+        
+        // ==================== SISTEMA DE STATS MEJORADO ====================
+        
+        // Función mejorada para mostrar estadísticas de ciudades con modal
+        function showCityStatsModal(cityIndex) {
+            var cityData = appState.persistentNames.cities[cityIndex];
+            if (!cityData) return;
+            
+            var stats = cityData.stats || generateCityStats();
+            var statsHtml = `
+                <div class="stats-panel">
+                    <h3>🏰 ${cityData.name}</h3>
+                    <div class="stats-grid">
+                        <div class="stat-row">
+                            <span class="stat-label">👥 Población:</span>
+                            <span class="stat-value">${stats.population.toLocaleString()}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">💰 Riqueza:</span>
+                            <span class="stat-value">${getWealthDescription(stats.wealth)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">🛡️ Defensa:</span>
+                            <span class="stat-value">${getDefenseDescription(stats.defense)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">🏪 Comercio:</span>
+                            <span class="stat-value">${getTradeDescription(stats.trade)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">✨ Magia:</span>
+                            <span class="stat-value">${getMagicDescription(stats.magic)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">🏛️ Gobierno:</span>
+                            <span class="stat-value">${stats.government || generateGovernment()}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">🤝 Alianzas:</span>
+                            <span class="stat-value">${stats.alliances ? stats.alliances.join(', ') : 'Ninguna'}</span>
+                        </div>
+                    </div>
+                    <div class="description-section">
+                        <h4>📜 Descripción:</h4>
+                        <p>${cityData.description}</p>
+                    </div>
+                    <div class="stats-actions">
+                        <button onclick="editCity(${cityIndex})" class="btn-primary">✏️ Editar</button>
+                        <button onclick="closeStatsPanel()" class="btn-secondary">✖️ Cerrar</button>
+                    </div>
+                </div>
+            `;
+            
+            showModal(statsHtml);
+        }
+        
+        // Funciones auxiliares para describir stats
+        function getWealthDescription(wealth) {
+            if (typeof wealth === 'string') return wealth;
+            if (wealth >= 90) return "Extremadamente Rica";
+            if (wealth >= 70) return "Muy Rica";
+            if (wealth >= 50) return "Rica"; 
+            if (wealth >= 30) return "Modesta";
+            return "Pobre";
+        }
+        
+        function getDefenseDescription(defense) {
+            if (typeof defense === 'string') return defense;
+            if (defense >= 90) return "Fortaleza Impenetrable";
+            if (defense >= 70) return "Muy Bien Defendida";
+            if (defense >= 50) return "Bien Defendida";
+            if (defense >= 30) return "Defensas Básicas";
+            return "Vulnerable";
+        }
+        
+        function getTradeDescription(trade) {
+            if (typeof trade === 'string') return trade;
+            if (trade >= 90) return "Centro Comercial Principal";
+            if (trade >= 70) return "Hub Comercial";
+            if (trade >= 50) return "Comercio Activo";
+            if (trade >= 30) return "Comercio Local";
+            return "Comercio Limitado";
+        }
+        
+        function getMagicDescription(magic) {
+            if (typeof magic === 'string') return magic;
+            if (magic >= 90) return "Fuertemente Mágica";
+            if (magic >= 70) return "Mágicamente Activa";
+            if (magic >= 50) return "Algo de Magia";
+            if (magic >= 30) return "Magia Ocasional";
+            return "Sin Magia";
+        }
+        
+        // Mostrar estadísticas de territorio
+        function showTerritoryStats(territoryIndex) {
+            var territory = appState.persistentNames.territories[territoryIndex];
+            if (!territory) return;
+            
+            var stats = territory.stats || generateTerritoryStats();
+            var statsHtml = `
+                <div class="stats-panel">
+                    <h3>🏛️ ${territory.name}</h3>
+                    <div class="stats-grid">
+                        <div class="stat-row">
+                            <span class="stat-label">👑 Gobierno:</span>
+                            <span class="stat-value">${stats.government}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">👥 Población Total:</span>
+                            <span class="stat-value">${stats.totalPopulation ? stats.totalPopulation.toLocaleString() : stats.population.toLocaleString()}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">💰 Recursos:</span>
+                            <span class="stat-value">${stats.resources ? stats.resources.join(', ') : generateResources()}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">⚔️ Poder Militar:</span>
+                            <span class="stat-value">${getMilitaryDescription(stats.militaryPower || stats.military)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">🤝 Relaciones:</span>
+                            <span class="stat-value">${stats.relations ? stats.relations.length + ' territorios' : 'Aislado'}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">🏰 Ciudades:</span>
+                            <span class="stat-value">${stats.cities || Math.floor(Math.random() * 5) + 1} ciudades</span>
+                        </div>
+                    </div>
+                    <div class="description-section">
+                        <h4>📜 Historia:</h4>
+                        <p>${territory.description}</p>
+                    </div>
+                    <div class="stats-actions">
+                        <button onclick="editTerritory(${territoryIndex})" class="btn-primary">✏️ Editar</button>
+                        <button onclick="closeStatsPanel()" class="btn-secondary">✖️ Cerrar</button>
+                    </div>
+                </div>
+            `;
+            
+            showModal(statsHtml);
+        }
+        
+        function getMilitaryDescription(power) {
+            if (typeof power === 'string') return power;
+            if (power >= 90) return "Imperio Dominante";
+            if (power >= 70) return "Gran Potencia";
+            if (power >= 50) return "Poder Regional";
+            if (power >= 30) return "Fuerza Menor";
+            return "Pacífico";
+        }
+        
+        // Sistema de modal mejorado
+        function showModal(content) {
+            var modal = document.createElement('div');
+            modal.className = 'stats-modal';
+            modal.innerHTML = `
+                <div class="modal-overlay" onclick="closeStatsPanel()"></div>
+                <div class="modal-content">
+                    ${content}
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function closeStatsPanel() {
+            var modal = document.querySelector('.stats-modal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+        
+        // Mejorar stats existentes con valores numéricos
+        function generateCityStats() {
+            return {
+                population: 1000 + Math.floor(Math.random() * 50000),
+                wealth: Math.floor(Math.random() * 100),
+                defense: Math.floor(Math.random() * 100),
+                trade: Math.floor(Math.random() * 100),
+                magic: Math.floor(Math.random() * 100),
+                government: generateGovernment(),
+                alliances: generateAlliances() !== 'Ninguna' ? [generateAlliances()] : []
+            };
+        }
+        
+        function generateTerritoryStats() {
+            return {
+                government: generateGovernment(),
+                totalPopulation: Math.floor(Math.random() * 500000) + 50000,
+                resources: generateResourcesList(),
+                militaryPower: Math.floor(Math.random() * 100),
+                relations: [],
+                cities: Math.floor(Math.random() * 8) + 2
+            };
+        }
+        
+        function generateResourcesList() {
+            var allResources = ['Hierro', 'Oro', 'Piedra', 'Madera', 'Textiles', 'Especias', 'Gemas', 'Sal', 'Carbón', 'Plata'];
+            var count = Math.floor(Math.random() * 4) + 2;
+            var selected = [];
+            
+            for (var i = 0; i < count; i++) {
+                var resource = allResources[Math.floor(Math.random() * allResources.length)];
+                if (selected.indexOf(resource) === -1) {
+                    selected.push(resource);
+                }
+            }
+              return selected;
+        }
+        
+        // ==================== LANGUAGE SYSTEM ====================
+        
+        // Language toggle function
+        function toggleLanguage() {
+            currentLanguage = (currentLanguage === 'es') ? 'en' : 'es';
+            updateUI();
+            localStorage.setItem('mapGeneratorLanguage', currentLanguage);
+            
+            // Update language button text
+            var langBtn = document.getElementById('language-btn');
+            langBtn.textContent = currentLanguage === 'es' ? '🌐 Idioma' : '🌐 Language';
+            
+            showNotification(currentLanguage === 'es' ? 'Idioma cambiado a Español' : 'Language changed to English');
+        }
+        
+        // Initialize translations when page loads
+        function initializeTranslations() {
+            // Load saved language preference
+            const savedLanguage = localStorage.getItem('mapGeneratorLanguage');
+            if (savedLanguage && translations[savedLanguage]) {
+                currentLanguage = savedLanguage;
+            }
+            
+            // Apply translations to UI
+            updateUI();
+            
+            // Update language button
+            var langBtn = document.getElementById('language-btn');
+            if (langBtn) {
+                langBtn.textContent = currentLanguage === 'es' ? '🌐 Idioma' : '🌐 Language';
+            }
+        }
+        
+        // Enhanced city interaction system
+        function addCityDotInteraction() {
+            if (!appState.mapData || !appState.mapData.cities) return;
+            
+            var svg = d3.select('#map g');
+            
+            // Remove existing city markers
+            svg.selectAll('.city-dot').remove();
+            
+            // Add interactive city dots
+            appState.mapData.cities.forEach(function(city, index) {
+                var cityData = appState.persistentNames.cities[index];
+                if (!cityData) return;
+                
+                var cityGroup = svg.append('g')
+                    .attr('class', 'city-dot')
+                    .attr('transform', `translate(${1000 * city[0]}, ${1000 * city[1]})`)
+                    .style('cursor', 'pointer');
+                
+                // City marker circle
+                cityGroup.append('circle')
+                    .attr('r', getCitySize(cityData.population))
+                    .attr('fill', getCityColor(cityData.specialty))
+                    .attr('stroke', '#FFD700')
+                    .attr('stroke-width', 2)
+                    .style('filter', 'drop-shadow(2px 2px 4px rgba(0,0,0,0.5))');
+                
+                // City name label
+                cityGroup.append('text')
+                    .attr('y', -15)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#FFE0B2')
+                    .attr('font-size', '12px')
+                    .attr('font-weight', 'bold')
+                    .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)')
+                    .text(cityData.name);
+                
+                // Click interaction
+                cityGroup.on('click', function() {
+                    d3.event.stopPropagation();
+                    showCityInfoPanel(cityData, index);
+                });
+                
+                // Context menu (right click)
+                cityGroup.on('contextmenu', function() {
+                    d3.event.preventDefault();
+                    d3.event.stopPropagation();
+                    
+                    var mouse = d3.mouse(document.body);
+                    createContextMenu([
+                        { text: t('editCity'), action: () => editCityInfo(index) },
+                        { text: t('deleteCity'), action: () => deleteCity(index) },
+                        { text: t('cityStats'), action: () => showCityStatsModal(index) }
+                    ], mouse[0], mouse[1]);
+                });
+            });
+        }
+        
+        function getCitySize(population) {
+            if (population < 5000) return 4;
+            if (population < 15000) return 6;
+            if (population < 50000) return 8;
+            return 10;
+        }
+        
+        function getCityColor(specialty) {
+            var colors = {
+                'Comercio': '#FFD700',
+                'Minería': '#8B4513',
+                'Agricultura': '#7CB342',
+                'Pesca': '#4A90E2',
+                'Artesanía': '#9C27B0',
+                'Magia': '#E91E63',
+                'Militar': '#F44336',
+                'Académica': '#2196F3'
+            };
+            return colors[specialty] || '#FFA726';
+        }
+        
+        function showCityInfoPanel(cityData, cityIndex) {
+            var panel = document.getElementById('info-panel');
+            var content = document.getElementById('info-content');
+            
+            var stats = cityData.stats || generateCityStats();
+            
+            content.innerHTML = `
+                <h4>🏰 ${cityData.name}</h4>
+                <div class="city-info-grid">
+                    <div class="info-stat">
+                        <strong>${t('population')}</strong><br>
+                        ${stats.population.toLocaleString()} ${t('inhabitants')}
+                    </div>
+                    <div class="info-stat">
+                        <strong>${t('specialty')}</strong><br>
+                        ${t(cityData.specialty.toLowerCase())}
+                    </div>
+                    <div class="info-stat">
+                        <strong>${t('wealth')}</strong><br>
+                        ${getWealthDescription(stats.wealth)}
+                    </div>
+                    <div class="info-stat">
+                        <strong>${t('government')}</strong><br>
+                        ${t(stats.government.toLowerCase().replace('-', ''))}
+                    </div>
+                </div>
+                <hr>
+                <div class="city-description">
+                    <strong>${t('description')}</strong><br>
+                    ${cityData.description}
+                </div>
+                <div class="city-actions" style="margin-top: 15px;">
+                    <button onclick="editCityInfo(${cityIndex})" class="btn-small">${t('edit')}</button>
+                    <button onclick="showCityStatsModal(${cityIndex})" class="btn-small">${t('cityStats')}</button>
+                </div>
+            `;
+            
+            panel.style.display = 'block';
+            positionInfoPanel([cityData.position[0] * 1000, cityData.position[1] * 1000]);
+        }
+        
+        function editCityInfo(cityIndex) {
+            var cityData = appState.persistentNames.cities[cityIndex];
+            if (!cityData) return;
+            
+            var newName = prompt(t('enterNewName'), cityData.name);
+            if (newName && newName.trim() !== '') {
+                cityData.name = newName.trim();
+                addCityDotInteraction(); // Refresh city markers
+                showNotification(t('cityRenamed'));
+            }
+        }
+        
+        function deleteCity(cityIndex) {
+            var cityData = appState.persistentNames.cities[cityIndex];
+            if (!cityData) return;
+            
+            if (confirm(t('confirmDelete'))) {
+                appState.persistentNames.cities.splice(cityIndex, 1);
+                addCityDotInteraction(); // Refresh city markers
+                closeInfoPanel();
+                showNotification(t('cityDeleted'));
+            }
+        }
+        
+        // Enhanced event interaction system
+        function addEventDotInteraction() {
+            if (!appState.persistentNames.events) return;
+            
+            var svg = d3.select('#map g');
+            
+            // Remove existing event markers
+            svg.selectAll('.event-dot').remove();
+            
+            // Add interactive event dots
+            appState.persistentNames.events.forEach(function(eventData, index) {
+                var eventGroup = svg.append('g')
+                    .attr('class', 'event-dot')
+                    .attr('transform', `translate(${eventData.position[0] * 1000}, ${eventData.position[1] * 1000})`)
+                    .style('cursor', 'pointer');
+                
+                // Event marker
+                eventGroup.append('circle')
+                    .attr('r', 6)
+                    .attr('fill', getEventColor(eventData.type))
+                    .attr('stroke', '#FFF')
+                    .attr('stroke-width', 2)
+                    .style('filter', 'drop-shadow(1px 1px 3px rgba(0,0,0,0.7))');
+                
+                // Event icon
+                eventGroup.append('text')
+                    .attr('text-anchor', 'middle')
+                    .attr('y', 1)
+                    .attr('font-size', '8px')
+                    .attr('fill', '#FFF')
+                    .text(getEventIcon(eventData.type));
+                
+                // Click interaction
+                eventGroup.on('click', function() {
+                    d3.event.stopPropagation();
+                    showEventInfoPanel(eventData, index);
+                });
+                
+                // Context menu
+                eventGroup.on('contextmenu', function() {
+                    d3.event.preventDefault();
+                    d3.event.stopPropagation();
+                    
+                    var mouse = d3.mouse(document.body);
+                    createContextMenu([
+                        { text: t('editEvent'), action: () => editEventInfo(index) },
+                        { text: t('deleteEvent'), action: () => deleteEvent(index) }
+                    ], mouse[0], mouse[1]);
+                });
+            });
+        }
+        
+        function getEventColor(type) {
+            var colors = {
+                'ruins': '#8D6E63',
+                'tower': '#9C27B0',
+                'cave': '#5D4037',
+                'temple': '#FF9800',
+                'battlefield': '#F44336',
+                'portal': '#E91E63',
+                'dragon': '#D32F2F'
+            };
+            return colors[type] || '#607D8B';
+        }
+        
+        function getEventIcon(type) {
+            var icons = {
+                'ruins': '🏛️',
+                'tower': '🗼',
+                'cave': '🕳️',
+                'temple': '⛩️',
+                'battlefield': '⚔️',
+                'portal': '🌀',
+                'dragon': '🐉'
+            };
+            return icons[type] || '❓';
+        }
+        
+        function showEventInfoPanel(eventData, eventIndex) {
+            var panel = document.getElementById('info-panel');
+            var content = document.getElementById('info-content');
+            
+            content.innerHTML = `
+                <h4>${getEventIcon(eventData.type)} ${eventData.name}</h4>
+                <div class="event-info-grid">
+                    <div class="info-stat">
+                        <strong>${t('type')}</strong><br>
+                        ${t(eventData.type)}
+                    </div>
+                    <div class="info-stat">
+                        <strong>${t('difficulty')}</strong><br>
+                        ${t(eventData.difficulty.toLowerCase())}
+                    </div>
+                </div>
+                <hr>
+                <div class="event-description">
+                    <strong>${t('description')}</strong><br>
+                    ${eventData.description}
+                </div>
+                <div class="event-details" style="margin-top: 10px;">
+                    <strong>${t('rewards')}</strong><br>
+                    ${eventData.rewards.map(reward => t(reward.toLowerCase().replace(' ', ''))).join(', ')}
+                </div>
+                <div class="event-actions" style="margin-top: 15px;">
+                    <button onclick="editEventInfo(${eventIndex})" class="btn-small">${t('edit')}</button>
+                </div>
+            `;
+            
+            panel.style.display = 'block';
+            positionInfoPanel([eventData.position[0] * 1000, eventData.position[1] * 1000]);
+        }
+        
+        function editEventInfo(eventIndex) {
+            var eventData = appState.persistentNames.events[eventIndex];
+            if (!eventData) return;
+            
+            var newName = prompt(t('enterNewName'), eventData.name);
+            if (newName && newName.trim() !== '') {
+                eventData.name = newName.trim();
+                addEventDotInteraction(); // Refresh event markers
+                showNotification(t('eventUpdated'));
+            }
+        }
+        
+        function deleteEvent(eventIndex) {
+            var eventData = appState.persistentNames.events[eventIndex];
+            if (!eventData) return;
+            
+            if (confirm(t('confirmDelete'))) {
+                appState.persistentNames.events.splice(eventIndex, 1);
+                addEventDotInteraction(); // Refresh event markers
+                closeInfoPanel();
+                showNotification(t('eventUpdated'));
+            }
+        }
+    </script>
+    
+    <!-- CSS para modales de stats -->
+    <style>
+        .stats-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            position: relative;
+            background: linear-gradient(135deg, #2C1810 0%, #4A2C17 100%);
+            border: 2px solid #D4AF37;
+            border-radius: 15px;
+            padding: 0;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+        
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8) translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        .stats-panel {
+            color: #E8D5B7;
+            font-family: 'Georgia', serif;
+        }
+        
+        .stats-panel h3 {
+            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 100%);
+            color: #000;
+            margin: 0;
+            padding: 20px;
+            border-radius: 13px 13px 0 0;
+            text-align: center;
+            font-size: 20px;
+            text-shadow: none;
+        }
+        
+        .stats-grid {
+            padding: 20px;
+            display: grid;
+            gap: 12px;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(139, 69, 19, 0.2);
+            border-radius: 8px;
+            border-left: 4px solid #D4AF37;
+        }
+        
+        .stat-label {
+            font-weight: bold;
+            color: #D4AF37;
+        }
+        
+        .stat-value {
+            color: #FFE0B2;
+            font-weight: bold;
+        }
+        
+        .description-section {
+            padding: 0 20px 20px;
+        }
+        
+        .description-section h4 {
+            color: #D4AF37;
+            margin: 0 0 10px 0;
+            border-bottom: 1px solid #8B4513;
+            padding-bottom: 5px;
+        }
+        
+        .description-section p {
+            line-height: 1.6;
+            margin: 0;
+        }
+        
+        .stats-actions {
+            padding: 20px;
+            border-top: 1px solid #8B4513;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 100%);
+            color: #000;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139, 69, 19, 0.4);
+        }
+        
+        /* Responsive para modales */
+        @media (max-width: 600px) {
+            .modal-content {
+                margin: 20px;
+                max-width: calc(100vw - 40px);
+            }
+            
+            .stats-actions {
+                flex-direction: column;
+            }
+            
+            .btn-primary, .btn-secondary {
+                width: 100%;
+            }
+        }
+    </style>
+    </script>
+</body>
+</html>

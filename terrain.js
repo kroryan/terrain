@@ -690,23 +690,102 @@ function makeD3Path(path) {
     return p.toString();
 }
 
-function visualizeVoronoi(svg, field, lo, hi) {
-    if (hi == undefined) hi = d3.max(field) + 1e-9;
-    if (lo == undefined) lo = d3.min(field) - 1e-9;
-    var mappedvals = field.map(function (x) {return x > hi ? 1 : x < lo ? 0 : (x - lo) / (hi - lo)});
-    var tris = svg.selectAll('path.field').data(field.mesh.tris)
+// Visualización normal del terreno (blanco y negro original)
+function visualizeTerrain(svg, field) {
+    var tris = svg.selectAll('path.field').data(field.mesh.tris);
+    
     tris.enter()
         .append('path')
         .classed('field', true);
     
-    tris.exit()
-        .remove();
+    tris.exit().remove();
 
     svg.selectAll('path.field')
         .attr('d', makeD3Path)
         .style('fill', function (d, i) {
-            return d3.interpolateViridis(mappedvals[i]);
-        });
+            if (field[i] <= 0) {
+                // Agua: solo azul básico según profundidad
+                var depth = Math.abs(field[i]);
+                if (depth > 0.5) return '#001122'; // Azul muy oscuro para océano profundo
+                if (depth > 0.2) return '#003366'; // Azul oscuro para océano
+                return '#4169E1'; // Azul básico para aguas poco profundas
+            } else {
+                // Tierra: SOLO blanco, gris y negro según altura
+                var height = field[i];
+                if (height > 0.8) return '#FFFFFF'; // Blanco para picos nevados
+                if (height > 0.6) return '#CCCCCC'; // Gris claro para montañas altas
+                if (height > 0.4) return '#999999'; // Gris medio para colinas
+                if (height > 0.2) return '#666666'; // Gris oscuro para llanuras altas
+                if (height > 0.1) return '#AAAAAA'; // Gris para llanuras medias
+                return '#DDDDDD'; // Gris muy claro para costa
+            }
+        })
+        .style('stroke', 'none');
+}
+
+// Visualización de alturas con escala de grises
+function visualizeHeight(svg, field) {
+    var lo = d3.min(field);
+    var hi = d3.max(field);
+    var mappedvals = field.map(function (x) {return x > hi ? 1 : x < lo ? 0 : (x - lo) / (hi - lo)});
+    
+    var tris = svg.selectAll('path.field').data(field.mesh.tris);
+    
+    tris.enter()
+        .append('path')
+        .classed('field', true);
+    
+    tris.exit().remove();
+
+    svg.selectAll('path.field')
+        .attr('d', makeD3Path)
+        .style('fill', function (d, i) {
+            var intensity = mappedvals[i];
+            if (field[i] <= 0) {
+                // Agua: azules más oscuros según profundidad
+                var blue = Math.floor(255 * (1 - intensity * 0.8));
+                return 'rgb(0,0,' + blue + ')';
+            } else {
+                // Tierra: escala de grises
+                var gray = Math.floor(255 * intensity);
+                return 'rgb(' + gray + ',' + gray + ',' + gray + ')';
+            }
+        })
+        .style('stroke', 'none');
+}
+
+// Visualización política (territorios con colores)
+function visualizePolitical(svg, field, territories, territoryColors) {
+    var tris = svg.selectAll('path.field').data(field.mesh.tris);
+    
+    tris.enter()
+        .append('path')
+        .classed('field', true);
+    
+    tris.exit().remove();
+
+    svg.selectAll('path.field')
+        .attr('d', makeD3Path)
+        .style('fill', function (d, i) {
+            if (field[i] <= 0) {
+                // Agua: mantener colores azules
+                var depth = Math.abs(field[i]);
+                if (depth > 0.5) return '#000080';
+                if (depth > 0.2) return '#4169E1';
+                return '#6495ED';
+            } else {
+                // Tierra: colorear según territorio
+                var territory = territories[i];
+                return territoryColors[territory] || '#8FBC8F';
+            }
+        })
+        .style('stroke', 'none')
+        .style('opacity', 0.8);
+}
+
+// Función legacy para compatibilidad (ahora usa escala de grises)
+function visualizeVoronoi(svg, field, lo, hi) {
+    visualizeHeight(svg, field);
 }
 
 function visualizeDownhill(h) {
@@ -786,25 +865,89 @@ function visualizeBorders(h, cities, n) {
 
 
 function visualizeCities(svg, render) {
-    var cities = render.cities;
-    var h = render.h;
-    var n = render.params.nterrs;
-
-    var circs = svg.selectAll('circle.city').data(cities);
-    circs.enter()
-            .append('circle')
-            .classed('city', true);
-    circs.exit()
-            .remove();
-    svg.selectAll('circle.city')
-        .attr('cx', function (d) {return 1000*h.mesh.vxs[d][0]})
-        .attr('cy', function (d) {return 1000*h.mesh.vxs[d][1]})
-        .attr('r', function (d, i) {return i >= n ? 4 : 10})
-        .style('fill', 'white')
-        .style('stroke-width', 5)
-        .style('stroke-linecap', 'round')
-        .style('stroke', 'black')
-        .raise();
+    // Limpiar ciudades existentes
+    svg.selectAll('.city-group').remove();
+    
+    if (!render.cities) return;
+    
+    // Crear grupo para ciudades
+    var cityGroups = svg.selectAll('.city-group')
+        .data(render.cities)
+        .enter()
+        .append('g')
+        .attr('class', 'city-group')
+        .attr('transform', function(d) {
+            return 'translate(' + (1000 * d[0]) + ',' + (1000 * d[1]) + ')';
+        });
+    
+    // Determinar tamaño de ciudad basado en su importancia
+    cityGroups.each(function(d, i) {
+        var group = d3.select(this);
+        var population = 1000 + Math.random() * 50000;
+        var isCapital = i < render.params.nterrs; // Primeras N ciudades son capitales
+        var isMajor = population > 30000;
+        var radius, strokeWidth, fillColor, strokeColor;
+        
+        if (isCapital) {
+            // Capitales - grandes, cuadradas, doradas
+            radius = 10;
+            strokeWidth = 3;
+            fillColor = '#FFD700';
+            strokeColor = '#B8860B';
+            
+            group.append('rect')
+                .attr('x', -radius/2)
+                .attr('y', -radius/2)
+                .attr('width', radius)
+                .attr('height', radius)
+                .attr('fill', fillColor)
+                .attr('stroke', strokeColor)
+                .attr('stroke-width', strokeWidth);
+                
+            // Corona para capitales
+            group.append('circle')
+                .attr('r', radius + 3)
+                .attr('fill', 'none')
+                .attr('stroke', '#FFD700')
+                .attr('stroke-width', 1)
+                .attr('opacity', 0.6);
+                
+        } else if (isMajor) {
+            // Ciudades grandes - medianas, círculos, plateadas
+            radius = 7;
+            strokeWidth = 2;
+            fillColor = '#C0C0C0';
+            strokeColor = '#808080';
+            
+            group.append('circle')
+                .attr('r', radius)
+                .attr('fill', fillColor)
+                .attr('stroke', strokeColor)
+                .attr('stroke-width', strokeWidth);
+                
+        } else {
+            // Pueblos - pequeños, círculos, bronce
+            radius = 4;
+            strokeWidth = 1;
+            fillColor = '#CD7F32';
+            strokeColor = '#8B4513';
+            
+            group.append('circle')
+                .attr('r', radius)
+                .attr('fill', fillColor)
+                .attr('stroke', strokeColor)
+                .attr('stroke-width', strokeWidth);
+        }
+        
+        // Agregar glow effect para mejor visibilidad
+        group.append('circle')
+            .attr('r', radius + 2)
+            .attr('fill', 'none')
+            .attr('stroke', fillColor)
+            .attr('stroke-width', 0.5)
+            .attr('opacity', 0.3)
+            .attr('filter', 'blur(1px)');
+    });
 }
 
 function dropEdge(h, p) {
@@ -860,6 +1003,10 @@ function drawLabels(svg, render) {
     var avoids = [render.rivers, render.coasts, render.borders];
     var lang = makeRandomLanguage();
     var citylabels = [];
+    
+    // Use persistent names from appState if available
+    var persistentCities = (typeof appState !== 'undefined' && appState.persistentNames && appState.persistentNames.cities) ? appState.persistentNames.cities : [];
+    var persistentTerritories = (typeof appState !== 'undefined' && appState.persistentNames && appState.persistentNames.territories) ? appState.persistentNames.territories : [];
     function penalty(label) {
         var pen = 0;
         if (label.x0 < -0.45 * h.mesh.extent.width) pen += 100;
@@ -893,11 +1040,13 @@ function drawLabels(svg, render) {
             }
         }
         return pen;
-    }
-    for (var i = 0; i < cities.length; i++) {
+    }    for (var i = 0; i < cities.length; i++) {
         var x = h.mesh.vxs[cities[i]][0];
         var y = h.mesh.vxs[cities[i]][1];
-        var text = makeName(lang, 'city');
+        
+        // Use persistent city name if available, otherwise generate new
+        var text = (persistentCities[i] && persistentCities[i].name) ? persistentCities[i].name : makeName(lang, 'city');
+        
         var size = i < nterrs ? params.fontsizes.city : params.fontsizes.town;
         var sx = 0.65 * size/1000 * text.length;
         var sy = size/1000;
@@ -956,13 +1105,18 @@ function drawLabels(svg, render) {
         .style('font-size', function (d) {return d.size})
         .style('text-anchor', function (d) {return d.align})
         .text(function (d) {return d.text})
-        .raise();
-
-    var reglabels = [];
+        .raise();    var reglabels = [];
     for (var i = 0; i < nterrs; i++) {
         var city = cities[i];
-        var text = makeName(lang, 'region');
-        var sy = params.fontsizes.region / 1000;
+        
+        // Use persistent territory name if available, otherwise generate new
+        var text = (persistentTerritories[i] && persistentTerritories[i].name) ? persistentTerritories[i].name : makeName(lang, 'region');
+        
+        // Make territory names larger in political view
+        var isPolitalView = (typeof appState !== 'undefined' && appState.filters && appState.filters.political);
+        var regionFontSize = isPolitalView ? params.fontsizes.region * 1.5 : params.fontsizes.region;
+        
+        var sy = regionFontSize / 1000;
         var sx = 0.6 * text.length * sy;
         var lc = terrCenter(h, terr, city, true);
         var oc = terrCenter(h, terr, city, false);
@@ -1005,13 +1159,12 @@ function drawLabels(svg, render) {
                 bestscore = score;
                 best = j;
             }
-        }
-        reglabels.push({
+        }        reglabels.push({
             text: text, 
             x: h.mesh.vxs[best][0], 
             y: h.mesh.vxs[best][1], 
-            size:sy, 
-            width:sx
+            size: sy, 
+            width: sx
         });
     }
     texts = svg.selectAll('text.region').data(reglabels);
@@ -1029,45 +1182,420 @@ function drawLabels(svg, render) {
         .raise();
 
 }
-function drawMap(svg, render) {
-    render.rivers = getRivers(render.h, 0.01);
-    render.coasts = contour(render.h, 0);
-    render.terr = getTerritories(render);
-    render.borders = getBorders(render);
-    drawPaths(svg, 'river', render.rivers);
-    drawPaths(svg, 'coast', render.coasts);
-    drawPaths(svg, 'border', render.borders);
-    visualizeSlopes(svg, render);
-    visualizeCities(svg, render);
-    drawLabels(svg, render);
+
+// Sistema de biomas mejorado
+function calculateBiome(height, distance_to_water, temperature, humidity, latitude) {
+    // Normalizar valores
+    var temp_factor = temperature / 100;
+    var humid_factor = humidity / 100;
+    var lat_factor = Math.abs(latitude);
+    
+    // Biomas oceánicos
+    if (height <= 0) {
+        if (height < -0.5) return 'deepOcean';
+        if (distance_to_water === 0) return 'ocean';
+        return 'coast';
+    }
+    
+    // Biomas terrestres
+    if (height < 0.1 && distance_to_water < 0.1) return 'beach';
+    
+    // Biomas de altura
+    if (height > 0.7) {
+        if (temp_factor < 0.3 || lat_factor > 0.7) return 'snow';
+        return 'mountain';
+    }
+    
+    // Biomas basados en temperatura y humedad
+    if (temp_factor < 0.2) return 'tundra';
+    if (temp_factor > 0.8 && humid_factor < 0.3) return 'desert';
+    if (humid_factor > 0.7 && temp_factor > 0.6) return 'jungle';
+    if (humid_factor < 0.4 && height < 0.3) return 'swamp';
+    if (humid_factor > 0.5) return 'forest';
+    
+    return 'grassland';
 }
 
-function doMap(svg, params) {
+function getBiomes(h, temperature, humidity) {
+    temperature = temperature || 50;
+    humidity = humidity || 50;
+    
+    var biomes = [];
+    var water_distance = getWaterDistance(h);
+    
+    for (var i = 0; i < h.length; i++) {
+        var pos = h.mesh.vxs[i];
+        var height = h[i];
+        var dist_water = water_distance[i];
+        var latitude = Math.abs(pos[1] / h.mesh.extent.height);
+        
+        biomes[i] = calculateBiome(height, dist_water, temperature, humidity, latitude);
+    }
+    
+    biomes.mesh = h.mesh;
+    return biomes;
+}
+
+function getWaterDistance(h) {
+    var distances = new Array(h.length);
+    var queue = [];
+    
+    // Inicializar con puntos de agua
+    for (var i = 0; i < h.length; i++) {
+        if (h[i] <= 0) {
+            distances[i] = 0;
+            queue.push(i);
+        } else {
+            distances[i] = Infinity;
+        }
+    }
+    
+    // BFS para calcular distancias
+    var queueIndex = 0;
+    while (queueIndex < queue.length) {
+        var current = queue[queueIndex++];
+        var currentDist = distances[current];
+        var nbs = neighbours(h.mesh, current);
+        
+        for (var i = 0; i < nbs.length; i++) {
+            var neighbor = nbs[i];
+            var newDist = currentDist + distance(h.mesh, current, neighbor);
+            
+            if (newDist < distances[neighbor]) {
+                distances[neighbor] = newDist;
+                queue.push(neighbor);
+            }
+        }
+    }
+    
+    // Normalizar distancias
+    var maxDist = Math.max.apply(Math, distances.filter(d => d !== Infinity));
+    for (var i = 0; i < distances.length; i++) {
+        if (distances[i] === Infinity) distances[i] = maxDist;
+        distances[i] = distances[i] / maxDist;
+    }
+    
+    return distances;
+}
+
+// Función mejorada de visualización con biomas
+function visualizeBiomes(svg, h, biomes, biomeColors) {
+    if (!biomes || !biomeColors) return;
+    
+    // Usar la estructura de triangulación existente
+    var tris = svg.selectAll('path.biome').data(h.mesh.tris);
+    
+    tris.enter()
+        .append('path')
+        .classed('biome', true);
+    
+    tris.exit().remove();
+    
+    svg.selectAll('path.biome')
+        .attr('d', makeD3Path)
+        .style('fill', function(d, i) {
+            var biome = biomes[i];
+            return biomeColors[biome] || '#8FBC8F';
+        })
+        .style('stroke', 'none')
+        .style('opacity', 0.8);
+}
+
+// Función para renderizar eventos/POIs
+function renderEvents(svg, events) {
+    var eventGroups = svg.selectAll('g.event-marker')
+        .data(events);
+    
+    var enterGroups = eventGroups.enter()
+        .append('g')
+        .classed('event-marker', true);
+    
+    enterGroups.append('circle')
+        .attr('r', 8)
+        .style('fill', 'rgba(255, 255, 255, 0.9)')
+        .style('stroke', '#8B4513')
+        .style('stroke-width', 2);
+    
+    enterGroups.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('y', 4)
+        .style('font-size', '12px')
+        .style('pointer-events', 'none');
+    
+    eventGroups.exit().remove();
+    
+    svg.selectAll('g.event-marker')
+        .attr('transform', function(d) {
+            return 'translate(' + (1000 * d.position[0]) + ',' + (1000 * d.position[1]) + ')';
+        })
+        .style('cursor', 'pointer');
+    
+    svg.selectAll('g.event-marker text')
+        .text(function(d) { return d.icon; });
+}
+
+// Función mejorada para ciudades con diferentes tamaños
+function visualizeCitiesEnhanced(svg, render, cityData) {
+    var cities = render.cities;
+    var h = render.h;
+    var n = render.params.nterrs;
+
+    var cityGroups = svg.selectAll('g.city-marker')
+        .data(cities);
+    
+    var enterGroups = cityGroups.enter()
+        .append('g')
+        .classed('city-marker', true);
+    
+    // Círculo de la ciudad
+    enterGroups.append('circle')
+        .classed('city-circle', true);
+    
+    // Texto del nombre
+    enterGroups.append('text')
+        .classed('city', true);
+    
+    cityGroups.exit().remove();
+    
+    svg.selectAll('g.city-marker')
+        .attr('transform', function(d) {
+            return 'translate(' + (1000 * h.mesh.vxs[d][0]) + ',' + (1000 * h.mesh.vxs[d][1]) + ')';
+        })
+        .style('cursor', 'pointer');
+    
+    svg.selectAll('circle.city-circle')
+        .attr('r', function(d, i) {
+            var pop = cityData[i] ? cityData[i].population : 5000;
+            var baseSize = i >= n ? 4 : 10;
+            var sizeMultiplier = Math.log(pop / 1000) / 3;
+            return Math.max(baseSize, baseSize * sizeMultiplier);
+        })
+        .style('fill', function(d, i) {
+            return i >= n ? '#FFE0B2' : '#FFD700';
+        })
+        .style('stroke-width', 3)
+        .style('stroke-linecap', 'round')
+        .style('stroke', '#8B4513');
+    
+    svg.selectAll('text.city')
+        .attr('y', -15)
+        .text(function(d, i) {
+            return cityData[i] ? cityData[i].name : 'Ciudad ' + i;
+        });
+}
+
+// Función para aplicar filtros visuales
+function applyMapFilters(svg, filters) {
+    // Handle biome/terrain background toggle (handled in updateMapVisualization)
+    
+    // Handle other feature toggles
+    svg.selectAll('g.city-marker').style('display', filters.cities ? 'block' : 'none');
+    svg.selectAll('g.event-marker').style('display', filters.events ? 'block' : 'none');
+    svg.selectAll('path.border').style('display', filters.borders ? 'block' : 'none');
+    svg.selectAll('path.river').style('display', filters.physical ? 'block' : 'none');
+    svg.selectAll('path.coast').style('display', filters.physical ? 'block' : 'none');
+    svg.selectAll('line.slope').style('display', filters.physical ? 'block' : 'none');
+}
+
+// Función para generar datos de clima
+function generateClimate(h) {
+    var climate = new Array(h.length);
+    
+    for (var i = 0; i < h.length; i++) {
+        var pos = h.mesh.vxs[i];
+        var height = h[i];
+        var latitude = Math.abs(pos[1] / h.mesh.extent.height);
+        
+        // Temperatura basada en latitud y altitud
+        var temperature = (1 - latitude) * 100 - height * 30;
+        temperature = Math.max(0, Math.min(100, temperature));
+        
+        // Humedad basada en proximidad al agua
+        var humidity = height <= 0 ? 100 : 30 + Math.random() * 40;
+        
+        climate[i] = {
+            temperature: temperature,
+            humidity: humidity,
+            precipitation: humidity * 0.8 + Math.random() * 20
+        };
+    }
+    
+    climate.mesh = h.mesh;
+    return climate;
+}
+
+// Función para visualizar clima
+function visualizeClimate(svg, h, climate) {
+    if (!climate || !h.mesh) return;
+    
+    var tris = svg.selectAll('path.climate').data(h.mesh.tris);
+    
+    tris.enter()
+        .append('path')
+        .classed('climate', true);
+    
+    tris.exit().remove();
+    
+    svg.selectAll('path.climate')
+        .attr('d', makeD3Path)
+        .style('fill', function(d, i) {
+            if (i >= climate.length) return '#666';
+            var temp = climate[i].temperature;
+            // Color gradient from blue (cold) to red (hot)
+            var normalized = temp / 100;
+            var r = Math.floor(normalized * 255);
+            var b = Math.floor((1 - normalized) * 255);
+            var g = Math.floor(128 * (1 - Math.abs(normalized - 0.5) * 2));
+            return 'rgb(' + r + ',' + g + ',' + b + ')';
+        })
+        .style('stroke', 'none')
+        .style('opacity', 0.8);
+}
+
+function visualizeMap(svg, render, options) {
+    // Generate core map data ONLY if not already generated
+    if (!render.rivers) render.rivers = getRivers(render.h, 0.01);
+    if (!render.coasts) render.coasts = contour(render.h, 0);
+    if (!render.terr) render.terr = getTerritories(render);
+    if (!render.borders) render.borders = getBorders(render);
+    if (!render.biomes) render.biomes = getBiomes(render.h, 50, 50);
+    if (!render.climate) render.climate = generateClimate(render.h);
+    
+    // Generate territory colors for political view ONLY if not already generated
+    if (!render.territoryColors) {
+        render.territoryColors = {};
+        var colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA'];
+        var cities = render.cities;
+        for (var i = 0; i < cities.length && i < colors.length; i++) {
+            render.territoryColors[cities[i]] = colors[i];
+        }
+    }
+    
+    // Default biome colors
+    var biomeColors = {
+        'ocean': '#4682B4',
+        'deepOcean': '#191970',
+        'coast': '#6495ED',
+        'beach': '#F4A460',
+        'grassland': '#9ACD32',
+        'forest': '#228B22',
+        'jungle': '#006400',
+        'desert': '#F4A460',
+        'tundra': '#B0C4DE',
+        'swamp': '#556B2F',
+        'mountain': '#8B7D6B',
+        'snow': '#FFFAFA'
+    };
+    
+    // Clear all existing terrain visualizations
+    svg.selectAll('path.field').remove();
+    svg.selectAll('path.biome').remove();
+    svg.selectAll('path.cell').remove();
+    svg.selectAll('path.climate').remove();
+    
+    // Render background based on view mode and filters
+    var viewMode = options && options.view ? options.view : 'normal';
+    var showBiomes = options && options.biomes;
+    var showPolitical = options && options.political;
+    
+    if (viewMode === 'height') {
+        // Vista de alturas (escala de grises)
+        visualizeHeight(svg, render.h);
+    } else if (viewMode === 'climate') {
+        // Vista de clima (colores de temperatura)
+        visualizeClimate(svg, render.h, render.climate);
+    } else if (showPolitical) {
+        // Vista política (colores por territorio)
+        visualizePolitical(svg, render.h, render.terr, render.territoryColors);
+    } else if (showBiomes) {
+        // Vista con biomas
+        visualizeBiomes(svg, render.h, render.biomes, biomeColors);
+    } else {
+        // Vista normal (terreno natural)
+        visualizeTerrain(svg, render.h);
+    }
+    
+    // Render features on top based on filters
+    if (options && options.physical) {
+        drawPaths(svg, 'river', render.rivers);
+        drawPaths(svg, 'coast', render.coasts);
+        visualizeSlopes(svg, render);
+    }
+    
+    if (options && options.borders) {
+        drawPaths(svg, 'border', render.borders);
+    }
+    
+    if (options && options.cities) {
+        visualizeCities(svg, render);
+    }
+    
+    // Draw labels ONLY if not specifically disabled
+    if (!options || options.labels !== false) {
+        drawLabels(svg, render);
+    }
+}
+
+function doMap(svg, params, options) {
     var render = {
         params: params
     };
     var width = svg.attr('width');
+    if (!width || width === "100%") {
+        width = 1000; // Default width
+    }
     svg.attr('height', width * params.extent.height / params.extent.width);
     svg.attr('viewBox', -1000 * params.extent.width/2 + ' ' + 
                         -1000 * params.extent.height/2 + ' ' + 
                         1000 * params.extent.width + ' ' + 
                         1000 * params.extent.height);
-    svg.selectAll().remove();
+    
+    // Crear grupo principal para transformaciones
+    var mainGroup = svg.append('g').attr('class', 'map-group');
+    
     render.h = params.generator(params);
     placeCities(render);
-    drawMap(svg, render);
+    visualizeMap(mainGroup, render, options);    // Retornar datos del mapa para uso en la interfaz
+    return {
+        mesh: render.h.mesh,
+        heights: render.h,
+        cities: render.cities,
+        rivers: render.rivers,
+        coasts: render.coasts,
+        territories: render.terr,
+        territoryColors: render.territoryColors,
+        borders: render.borders,
+        biomes: render.biomes,
+        climate: render.climate,
+        params: params
+    };
 }
 
-var defaultParams = {
-    extent: defaultExtent,
-    generator: generateCoast,
-    npts: 16384,
-    ncities: 15,
-    nterrs: 5,
-    fontsizes: {
-        region: 40,
-        city: 25,
-        town: 20
+// Función para actualizar visualización con nuevos filtros
+function updateVisualization(svg, mapData, options) {
+    if (!mapData || !svg) return;
+    
+    var render = {
+        h: mapData.heights,
+        cities: mapData.cities,
+        rivers: mapData.rivers,
+        coasts: mapData.coasts,
+        terr: mapData.territories,
+        territoryColors: mapData.territoryColors,
+        borders: mapData.borders,
+        biomes: mapData.biomes,
+        climate: mapData.climate,
+        params: mapData.params
+    };
+    
+    // Clear and re-render with new options
+    var mainGroup = svg.select('g.map-group');
+    if (mainGroup.empty()) {
+        mainGroup = svg.append('g').attr('class', 'map-group');
+    } else {
+        mainGroup.selectAll('*').remove();
     }
+    
+    visualizeMap(mainGroup, render, options);
 }
 
