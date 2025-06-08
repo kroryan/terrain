@@ -288,176 +288,190 @@ function visualizeCitiesEnhanced(svg, render, cityData) {
 
 // Función para renderizar eventos con puntos clicables
 function renderEvents(svg, events) {
-    if (!events || !Array.isArray(events)) return;
-    
-    // Limpiar eventos existentes
-    svg.selectAll('.event-group').remove();
+    if (!events || events.length === 0) return;
     
     const eventGroups = svg.selectAll('.event-group')
         .data(events)
         .enter()
         .append('g')
         .attr('class', 'event-group event-marker')
-        .attr('transform', d => `translate(${d.position[0]}, ${d.position[1]})`);
+        .attr('transform', function(d) {
+            return `translate(${d.position[0]}, ${d.position[1]})`;
+        });
     
-    // Círculo de fondo para mejor visibilidad
+    // Círculo base para el evento
     eventGroups.append('circle')
-        .attr('r', 12)
-        .attr('fill', 'rgba(0,0,0,0.6)')
-        .attr('stroke', '#D4AF37')
-        .attr('stroke-width', 1.5);
+        .attr('class', 'event-circle')
+        .attr('r', 6)
+        .attr('fill', function(d) {
+            // Color según tipo de evento
+            const eventColors = {
+                'dungeon': '#8D6E63',
+                'ruins': '#9C27B0',
+                'tower': '#5D4037',
+                'cave': '#FF9800',
+                'temple': '#F44336',
+                'battlefield': '#E91E63',
+                'portal': '#D32F2F',
+                'dragon': '#607D8B'
+            };
+            return eventColors[d.type] || '#607D8B';
+        })
+        .attr('stroke', '#FFFFFF')
+        .attr('stroke-width', 1.5)
+        .style('filter', 'drop-shadow(2px 2px 3px rgba(0,0,0,0.6))');
     
-    // Icono del evento
+    // Ícono del evento
     eventGroups.append('text')
         .attr('class', 'event-icon')
-        .attr('font-size', '16')
-        .attr('text-anchor', 'middle')
-        .attr('y', 5)
-        .style('filter', 'drop-shadow(1px 1px 2px rgba(0,0,0,0.7))')
-        .style('cursor', 'pointer')
-        .text(d => d.icon);
-    
-    // Etiqueta del evento (opcional, aparece en hover)
-    eventGroups.append('text')
-        .attr('class', 'event-label')
-        .attr('y', -18)
+        .attr('y', 3)
         .attr('text-anchor', 'middle')
         .style('font-size', '10px')
-        .style('font-weight', 'bold')
-        .style('fill', '#D4AF37')
-        .style('opacity', 0)
+        .style('fill', '#FFFFFF')
         .style('pointer-events', 'none')
-        .text(d => d.name);
+        .text(function(d) {
+            const eventIcons = {
+                'dungeon': '🏰',
+                'ruins': '🏛️',
+                'tower': '🗼',
+                'cave': '🕳️',
+                'temple': '⛩️',
+                'battlefield': '⚔️',
+                'portal': '🌀',
+                'dragon': '🐉'
+            };
+            return eventIcons[d.type] || '❓';
+        });
     
-    // Event listeners
+    // Agregar interactividad
     eventGroups.on('click', function(d) {
         d3.event.stopPropagation();
-        showEventInfo(d);
+        if (typeof showEventInfo === 'function') {
+            showEventInfo(d);
+        }
     });
     
-    eventGroups.on('contextmenu', function(d) {
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
-        showEventContextMenu(d3.event, d);
-    });
-    
-    // Mostrar etiqueta en hover
+    // Hover effects
     eventGroups.on('mouseenter', function() {
-        d3.select(this).select('.event-label')
+        d3.select(this).select('.event-circle')
             .transition()
             .duration(200)
-            .style('opacity', 1);
+            .attr('r', 8);
     });
     
     eventGroups.on('mouseleave', function() {
-        d3.select(this).select('.event-label')
+        d3.select(this).select('.event-circle')
             .transition()
             .duration(200)
-            .style('opacity', 0);
+            .attr('r', 6);
     });
 }
 
-// Función para configurar interactividad del mapa
+// Configurar interactividad para el mapa
 function setupMapInteractivity(svg, g) {
-    // Zoom y pan
+    // Configurar drag & zoom
     const zoom = d3.zoom()
-        .scaleExtent([0.3, 8])
+        .scaleExtent([0.5, 5])
         .on('zoom', function() {
-            if (d3.event.sourceEvent && d3.event.sourceEvent.ctrlKey) {
-                // Solo zoom con Ctrl presionado
-                g.attr('transform', d3.event.transform);
-                appState.zoom = d3.event.transform.k;
-                appState.pan = { x: d3.event.transform.x, y: d3.event.transform.y };
-            }
+            g.attr('transform', d3.event.transform);
         });
     
     svg.call(zoom);
     
-    // Click en el mapa para herramientas
-    svg.on('click', function() {
-        if (appState.currentTool !== 'select') {
-            const coords = d3.mouse(g.node());
-            handleToolClick(coords);
-        }
+    // Función para resetear la vista
+    svg.on('dblclick', function() {
+        svg.transition()
+            .duration(750)
+            .call(zoom.transform, d3.zoomIdentity);
     });
 }
 
-// Manejar clicks de herramientas
-function handleToolClick(coords) {
-    switch(appState.currentTool) {
-        case 'city':
-            addCityAtPosition(coords);
-            break;
-        case 'event':
-            addEventAtPosition(coords);
-            break;
-        case 'territory':
-            // Implementar lógica de territorio
-            break;
+// Función para preparar SVG para exportación optimizada
+function prepareForExport(svg) {
+    // Asegurarse de que todos los elementos tengan atributos de estilo explícitos
+    
+    // Optimizar paths
+    svg.selectAll('path').each(function() {
+        const path = d3.select(this);
+        const computedStyle = window.getComputedStyle(this);
+        
+        // Asegurar que el fill esté siempre especificado
+        if (!path.attr('fill') && computedStyle.fill !== 'none') {
+            path.attr('fill', computedStyle.fill);
+        }
+        
+        // Asegurar que el stroke esté siempre especificado
+        if (!path.attr('stroke') && computedStyle.stroke !== 'none') {
+            path.attr('stroke', computedStyle.stroke);
+            path.attr('stroke-width', computedStyle.strokeWidth);
+        }
+        
+        // Asegurar que otros atributos importantes estén explícitos
+        if (computedStyle.opacity !== '1' && !path.attr('opacity')) {
+            path.attr('opacity', computedStyle.opacity);
+        }
+        
+        if (computedStyle.fillOpacity !== '1' && !path.attr('fill-opacity')) {
+            path.attr('fill-opacity', computedStyle.fillOpacity);
+        }
+    });
+    
+    // Optimizar círculos y puntos
+    svg.selectAll('circle').each(function() {
+        const circle = d3.select(this);
+        const computedStyle = window.getComputedStyle(this);
+        
+        if (!circle.attr('fill')) {
+            circle.attr('fill', computedStyle.fill);
+        }
+        
+        if (!circle.attr('stroke') && computedStyle.stroke !== 'none') {
+            circle.attr('stroke', computedStyle.stroke);
+            circle.attr('stroke-width', computedStyle.strokeWidth);
+        }
+    });
+    
+    // Optimizar textos
+    svg.selectAll('text').each(function() {
+        const text = d3.select(this);
+        const computedStyle = window.getComputedStyle(this);
+        
+        if (!text.attr('fill')) {
+            text.attr('fill', computedStyle.fill);
+        }
+        
+        if (!text.attr('font-size')) {
+            text.attr('font-size', computedStyle.fontSize);
+        }
+        
+        if (!text.attr('font-family')) {
+            text.attr('font-family', computedStyle.fontFamily);
+        }
+        
+        if (!text.attr('font-weight') && computedStyle.fontWeight !== 'normal') {
+            text.attr('font-weight', computedStyle.fontWeight);
+        }
+        
+        if (!text.attr('text-anchor')) {
+            const anchor = computedStyle.textAnchor || 'start';
+            text.attr('text-anchor', anchor);
+        }
+    });
+    
+    return svg;
+}
+
+// Función unificada para actualizar la visualización del mapa
+function updateVisualization(svg, render, options) {
+    // Aplicar visualización según opciones
+    visualizeMap(svg, render, options);
+    
+    // Si es para exportación, optimizar el SVG
+    if (options && options.forExport) {
+        prepareForExport(svg);
     }
-}
-
-// Función para aplicar filtros visuales
-function applyMapFilters(svg, filters) {
-    // Mostrar/ocultar ciudades
-    svg.selectAll('.city-marker')
-        .style('display', filters.cities ? 'block' : 'none');
     
-    // Mostrar/ocultar eventos
-    svg.selectAll('.event-marker')
-        .style('display', filters.events ? 'block' : 'none');
-    
-    // Mostrar/ocultar fronteras
-    svg.selectAll('.border')
-        .style('display', filters.borders ? 'block' : 'none');
-}
-
-// Función para obtener colores de territorios
-function getTerritoryColors() {
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA'];
-    return appState.territories.map((territory, index) => territory.color || colors[index % colors.length]);
-}
-
-// Función para obtener colores de biomas
-function getBiomeColors() {
-    return {
-        'ocean': '#2E5984',
-        'deepOcean': '#1A365D',
-        'coast': '#4A90E2',
-        'beach': '#F4E4BC',
-        'grassland': '#7CB342',
-        'forest': '#388E3C',
-        'mountain': '#6D4C41',
-        'snow': '#E3F2FD',
-        'desert': '#FFB74D',
-        'jungle': '#2E7D32',
-        'swamp': '#4E342E',
-        'tundra': '#90A4AE'
-    };
-}
-
-// Función para generar datos de clima
-function generateClimate(h) {
-    const temperature = [];
-    const humidity = [];
-    
-    for (let i = 0; i < h.length; i++) {
-        const height = h[i];
-        const lat = Math.abs(h.mesh.vxs[i][1] / h.mesh.extent.height);
-        
-        // Temperatura basada en latitud y altura
-        let temp = 1 - lat; // Más caliente cerca del ecuador
-        temp -= Math.max(0, height) * 0.5; // Más frío en altura
-        temp = Math.max(0, Math.min(1, temp));
-        
-        // Humedad basada en proximidad al agua
-        let humid = height <= 0 ? 1 : Math.random() * 0.8 + 0.2;
-        
-        temperature[i] = temp;
-        humidity[i] = humid;
-    }
-    
-    return { temperature, humidity };
+    return svg;
 }
 
 // Función principal para actualizar visualización
